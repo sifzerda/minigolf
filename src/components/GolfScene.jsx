@@ -24,6 +24,18 @@ import FollowCamera from "../renderers/FollowCamera";
 import AimGuide from "../renderers/AimGuide";
 
 import GolfControls from "./GolfControls";
+import LightingRenderer from "./LightingRenderer";
+import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
+
+import HoleFlag from "../renderers/HoleFlag";
+
+const FLAG_COLORS = {
+  garden: "#ff4545",
+  desert: "#ff9f1c",
+  snow: "#0088ff",
+  volcanic: "#ff5500",
+  neon: "#00e5ff",
+};
 
 export default function GolfScene({ course }) {
   const ballRef = useRef(null);
@@ -37,13 +49,18 @@ export default function GolfScene({ course }) {
 
   return (
     <>
-      <ambientLight intensity={0.8} />
+      <LightingRenderer theme={theme} />
 
-      <directionalLight
-        position={[5, 12, 5]}
-        intensity={2}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
+      <EnvironmentRenderer
+        theme={course.environment ?? "garden"}
+      />
+
+      <HoleFlag
+        position={course.hole.position}
+        color={
+          FLAG_COLORS[course.environment] ??
+          FLAG_COLORS.garden
+        }
       />
 
       <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
@@ -67,6 +84,7 @@ export default function GolfScene({ course }) {
           <ObstacleRenderer
             key={entity.id}
             entity={entity}
+            ballRef={ballRef}
           />
         ))}
 
@@ -86,10 +104,10 @@ export default function GolfScene({ course }) {
           ballRef={ballRef}
         />
 
-      <AimGuide
-        ballRef={ballRef}
-        settledRef={settledRef}
-      />
+        <AimGuide
+          ballRef={ballRef}
+          settledRef={settledRef}
+        />
 
       </Physics>
 

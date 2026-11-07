@@ -14,7 +14,7 @@ import CourseSelectScreen from "../screens/CourseSelectScreen";
 //import ScorecardScreen from "../screens/ScorecardScreen";
 //import HowToPlayScreen from "../screens/HowToPlayScreen";
 //import SettingsScreen from "../screens/SettingsScreen";
-
+import { Stats } from "@react-three/drei";
 
 function SpinControls() {
     const topSpin = useGameStore(
@@ -230,7 +230,11 @@ export default function GolfGame() {
             {!gameComplete && (
                 <Canvas
                     key={`${courseIndex}-${sessionId}`}
-                    shadows
+                    shadows="soft"
+                    gl={{
+                        antialias: true,
+                        powerPreference: "high-performance",
+                    }}
                     camera={{
                         position: [0, 5, 15],
                         fov: 55,
@@ -239,6 +243,9 @@ export default function GolfGame() {
                     }}
                 >
                     <CourseSession courseIndex={courseIndex} />
+               
+               {import.meta.env.DEV && <Stats />}
+               
                 </Canvas>
             )}
 
@@ -273,7 +280,7 @@ export default function GolfGame() {
                                 }
                             />
 
-<ShotPowerMeter />
+                            <ShotPowerMeter />
 
                             <SpinControls />
 

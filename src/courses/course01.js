@@ -16,6 +16,7 @@ const course01 = {
   id: "course-01",
   number: 1,
   name: "First Steps",
+  environment: "garden",
   par: 2,
 
   ballStart: [0, 0.25, 8],

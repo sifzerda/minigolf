@@ -66,6 +66,11 @@ export default function BallPhysicsSystem({
     const ball = ballRef.current;
     if (!ball) return;
 
+    if (ball.isSleeping()) {
+      settledRef.current = true;
+      return;
+    }
+
     const ground = detectGround(world, ball);
     const position = ball.translation();
 
@@ -156,22 +161,22 @@ export default function BallPhysicsSystem({
       const correction = Math.min(
         1,
         PHYSICS.rolling.angularCorrection *
-          config.rollingGrip
+        config.rollingGrip
       );
 
       angular = {
         x:
           angular.x +
           (targetAngular.x - angular.x) *
-            correction,
+          correction,
         y:
           angular.y +
           (targetAngular.y - angular.y) *
-            correction,
+          correction,
         z:
           angular.z +
           (targetAngular.z - angular.z) *
-            correction,
+          correction,
       };
 
       ball.setAngvel(angular, true);
@@ -203,9 +208,9 @@ export default function BallPhysicsSystem({
 
     if (
       linearSpeed <
-        PHYSICS.rolling.sleepSpeed &&
+      PHYSICS.rolling.sleepSpeed &&
       angularSpeed <
-        PHYSICS.rolling.sleepSpin
+      PHYSICS.rolling.sleepSpin
     ) {
       // Remove tiny residual velocities.
       ball.setLinvel(

@@ -24,9 +24,12 @@ export default function GolfBall({ entity, ballRef }) {
 
       <mesh castShadow>
         <sphereGeometry args={[entity.radius, 32, 32]} />
-        <meshStandardMaterial
+        <meshPhysicalMaterial
           color="#ffffff"
-          roughness={0.35}
+          roughness={0.28}
+          metalness={0}
+          clearcoat={0.25}
+          clearcoatRoughness={0.2}
         />
       </mesh>
     </RigidBody>

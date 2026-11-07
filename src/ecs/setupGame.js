@@ -49,6 +49,9 @@ export function setupGame(course) {
       ...obstacle,
       obstacle: true,
       id: `${course.id}-obstacle-${index}`,
+      respawnPosition:
+        obstacle.respawnPosition ??
+        [...course.ballStart],
     });
   });
 }

@@ -16,6 +16,7 @@ const course04 = {
   id: "course-04",
   number: 4,
   name: "Moving Target",
+  environment: "volcanic",
   par: 3,
 
   ballStart: [0, 0.25, 8],

@@ -18,6 +18,7 @@ const course02 = {
   id: "course-02",
   number: 2,
   name: "The Bend",
+  environment: "desert",
   par: 3,
 
   ballStart: [0, 0.25, 8],
@@ -54,6 +55,18 @@ const course02 = {
       position: [0, 0.4, 0],
       radius: 0.45,
     },
+
+    {
+      type: "rotatingGate",
+      position: [0, 0.65, -5],
+      size: [2, 1, 0.2],
+      speed: 1.5,
+      openAngle: Math.PI / 2,
+      direction: 1,
+      pivot: "left",
+      color: "#e0a340",
+    }
+
   ],
 };
 

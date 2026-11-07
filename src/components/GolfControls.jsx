@@ -40,7 +40,11 @@ export default function GolfControls({
       1
     );
 
-    useGameStore.getState().setPower(power);
+    const state = useGameStore.getState();
+
+    if (Math.abs(state.power - power) >= 0.01) {
+      state.setPower(power);
+    }
   });
 
   useEffect(() => {
@@ -126,7 +130,7 @@ export default function GolfControls({
 
       state.setAimAngle(
         state.aimAngle -
-          event.movementX * ROTATION_SENSITIVITY
+        event.movementX * ROTATION_SENSITIVITY
       );
     }
 
@@ -149,7 +153,7 @@ export default function GolfControls({
 
       state.setCameraDistance(
         state.cameraDistance +
-          event.deltaY * 0.01
+        event.deltaY * 0.01
       );
     }
 
@@ -233,7 +237,7 @@ export default function GolfControls({
       if (!action) return;
 
       if (event.code === "Space" ||
-          event.code === "KeyJ") {
+        event.code === "KeyJ") {
         event.preventDefault();
       }
 

@@ -78,3 +78,30 @@ body {
   color: #c5d6cc;
 }
 
+.completion {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #ffffff33;
+}
+
+.completion h3 {
+  color: #a3ff12;
+  margin-bottom: 8px;
+}
+
+.completion button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  background: #a3ff12;
+  color: #102015;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.completion button:hover {
+  background: #c4ff65;
+}
+

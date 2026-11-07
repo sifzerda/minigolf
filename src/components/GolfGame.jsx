@@ -8,7 +8,10 @@ import GolfScene from "./GolfScene";
 import useGameStore from "../store/useGameStore";
 
 export default function GolfGame() {
-  const [session] = useState(() => {
+  const [sessionId, setSessionId] = useState(0);
+
+  // Initialize the ECS world once for this game.
+  useState(() => {
     setupGame();
     return true;
   });
@@ -18,24 +21,33 @@ export default function GolfGame() {
   const aimAngle = useGameStore((s) => s.aimAngle);
   const charging = useGameStore((s) => s.charging);
   const completed = useGameStore((s) => s.completed);
+
   const setPower = useGameStore((s) => s.setPower);
-  const degrees = ((Math.round(aimAngle * 180 / Math.PI) % 360) + 360) % 360;
+  const resetGame = useGameStore((s) => s.resetGame);
+
+  const degrees =
+    ((Math.round((aimAngle * 180) / Math.PI) % 360)
+      + 360) % 360;
+
+  function handleRestart() {
+    resetGame();
+    setSessionId((id) => id + 1);
+  }
 
   return (
     <div className="game">
-      {session && (
-        <Canvas
-          shadows
-          camera={{
-            position: [0, 5, 15],
-            fov: 55,
-            near: 0.1,
-            far: 100,
-          }}
-        >
-          <GolfScene />
-        </Canvas>
-      )}
+      <Canvas
+        key={sessionId}
+        shadows
+        camera={{
+          position: [0, 5, 15],
+          fov: 55,
+          near: 0.1,
+          far: 100,
+        }}
+      >
+        <GolfScene />
+      </Canvas>
 
       <div className="hud">
         <h2>Mini Golf</h2>
@@ -69,14 +81,21 @@ export default function GolfGame() {
         {charging && <p>Charging shot...</p>}
 
         {completed ? (
-          <h3>Hole Complete!</h3>
+          <div className="completion">
+            <h3>Hole Complete!</h3>
+            <p>Completed in {strokes} strokes.</p>
+
+            <button onClick={handleRestart}>
+              Play Again
+            </button>
+          </div>
         ) : (
           <div className="controls-help">
             <p>Right drag: Aim</p>
             <p>Left hold/release: Shoot</p>
             <p>Mouse wheel: Zoom</p>
-            <p>Space: Shoot with slider power</p>
-            <p>R: Reset ball position</p>
+            <p>Space: Shoot</p>
+            <p>R: Reset ball</p>
           </div>
         )}
       </div>

@@ -9,10 +9,11 @@ export default function GolfBall({ entity, ballRef }) {
   return (
     <RigidBody
       ref={ballRef}
+      userData={{ isGolfBall: true }}
       position={entity.position}
       colliders={false}
-      restitution={0.25}
-      friction={0.8}
+      restitution={0.15}
+      friction={0.85}
       linearDamping={0.65}
       angularDamping={1.2}
       ccd

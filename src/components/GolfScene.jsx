@@ -10,7 +10,7 @@ import {
 } from "../ecs/world";
 
 import GolfBall from "../physics/GolfBall";
-import HoleSystem from "../ecs/systems/HoleSystem";
+import HoleSensor from "../physics/HoleSensor";
 
 import CourseRenderer from "../renderers/CourseRenderer";
 import ObstacleRenderer from "../renderers/ObstacleRenderer";
@@ -52,6 +52,13 @@ export default function GolfScene() {
             entity={entity}
           />
         ))}
+
+        {ball && hole && (
+          <HoleSensor
+            hole={hole}
+            ballRef={ballRef}
+          />
+        )}
       </Physics>
 
       {ball && (
@@ -65,13 +72,6 @@ export default function GolfScene() {
             startPosition={ball.position}
           />
         </>
-      )}
-
-      {hole && (
-        <HoleSystem
-          ballRef={ballRef}
-          hole={hole}
-        />
       )}
     </>
   );

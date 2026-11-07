@@ -16,7 +16,7 @@ import HoleSensor from "../physics/HoleSensor";
 
 import BallPhysicsSystem from "../ecs/systems/BallPhysicsSystem";
 
-import CourseRenderer from "../renderers/CourseRenderer";
+import CourseGeometryRenderer from "../renderers/CourseGeometryRenderer";
 import RampRenderer from "../renderers/RampRenderer";
 import SurfaceRenderer from "../renderers/SurfaceRenderer";
 import ObstacleRenderer from "../renderers/ObstacleRenderer";
@@ -25,13 +25,15 @@ import AimGuide from "../renderers/AimGuide";
 
 import GolfControls from "./GolfControls";
 
-export default function GolfScene() {
+export default function GolfScene({ course }) {
   const ballRef = useRef(null);
   const settledRef = useRef(false);
   const activeSurfaceRef = useRef("grass");
 
   const ball = [...ballQuery][0];
   const hole = [...holeQuery][0];
+
+  if (!course || !ball || !hole) return null;
 
   return (
     <>
@@ -44,72 +46,60 @@ export default function GolfScene() {
         shadow-mapSize={[2048, 2048]}
       />
 
-      <Physics
-        gravity={[0, -9.81, 0]}
-        timeStep={1 / 60}
-      >
-        <CourseRenderer />
+      <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
+        <CourseGeometryRenderer course={course} />
 
-        {[...surfaceQuery].map((entity, index) => (
+        {[...surfaceQuery].map((entity) => (
           <SurfaceRenderer
-            key={`surface-${index}`}
+            key={entity.id}
             entity={entity}
           />
         ))}
 
-        {[...rampQuery].map((entity, index) => (
+        {[...rampQuery].map((entity) => (
           <RampRenderer
-            key={`ramp-${index}`}
+            key={entity.id}
             entity={entity}
           />
         ))}
 
-        {[...obstacleQuery].map((entity, index) => (
+        {[...obstacleQuery].map((entity) => (
           <ObstacleRenderer
-            key={`obstacle-${index}`}
+            key={entity.id}
             entity={entity}
           />
         ))}
 
-        {ball && (
-          <>
-            <GolfBall
-              entity={ball}
-              ballRef={ballRef}
-            />
+        <GolfBall
+          entity={ball}
+          ballRef={ballRef}
+        />
 
-            <BallPhysicsSystem
-              ballRef={ballRef}
-              settledRef={settledRef}
-              activeSurfaceRef={activeSurfaceRef}
-            />
-          </>
-        )}
+        <BallPhysicsSystem
+          ballRef={ballRef}
+          settledRef={settledRef}
+          activeSurfaceRef={activeSurfaceRef}
+        />
 
-        {ball && hole && (
-          <HoleSensor
-            hole={hole}
-            ballRef={ballRef}
-          />
-        )}
+        <HoleSensor
+          hole={hole}
+          ballRef={ballRef}
+        />
+
+      <AimGuide
+        ballRef={ballRef}
+        settledRef={settledRef}
+      />
+
       </Physics>
 
-      {ball && (
-        <>
-          <FollowCamera ballRef={ballRef} />
+      <FollowCamera ballRef={ballRef} course={course} />
 
-          <AimGuide
-            ballRef={ballRef}
-            settledRef={settledRef}
-          />
-
-          <GolfControls
-            ballRef={ballRef}
-            settledRef={settledRef}
-            startPosition={ball.position}
-          />
-        </>
-      )}
+      <GolfControls
+        ballRef={ballRef}
+        settledRef={settledRef}
+        startPosition={ball.position}
+      />
     </>
   );
 }

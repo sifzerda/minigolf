@@ -15,7 +15,7 @@ export default function GolfBall({ entity, ballRef }) {
       position={entity.position}
       colliders={false}
       restitution={PHYSICS.restitution}
-      friction={PHYSICS.friction}
+      friction={PHYSICS.surfaces.grass.friction}
       linearDamping={0.05}
       angularDamping={0.3}
       ccd

@@ -2,55 +2,53 @@
 
 import { world } from "./world";
 
-export function setupGame() {
+export function clearGame() {
   for (const entity of [...world.entities]) {
     world.remove(entity);
   }
+}
+
+export function setupGame(course) {
+  if (!course) {
+    throw new Error("A valid course is required");
+  }
+
+  clearGame();
 
   world.add({
+    id: `${course.id}-ball`,
     ball: true,
-    position: [0, 0.25, 8],
+    position: [...course.ballStart],
     radius: 0.25,
   });
 
   world.add({
+    id: `${course.id}-hole`,
     hole: true,
-    position: [0, 0, -8],
-    radius: 0.43,
+    position: [...course.hole.position],
+    radius: course.hole.radius,
   });
 
-  // Sand region
-  world.add({
-    surface: "sand",
-    position: [2.5, 0, 1],
-    size: [2, 3],
-    color: "#d8bc7a",
+  course.surfaces.forEach((surface, index) => {
+    world.add({
+      ...surface,
+      id: `${course.id}-surface-${index}`,
+    });
   });
 
-  // Ice region
-  world.add({
-    surface: "ice",
-    position: [-2.5, 0, -2],
-    size: [2, 3],
-    color: "#9be8ff",
+  course.ramps.forEach((ramp, index) => {
+    world.add({
+      ...ramp,
+      ramp: true,
+      id: `${course.id}-ramp-${index}`,
+    });
   });
 
-  // Raised ramp, positioned off the main path.
-const rampLength = 3;
-const rampThickness = 0.2;
-const rampAngle = -0.2;
-
-world.add({
-  ramp: true,
-  surface: "grass",
-  position: [
-    2.5,
-    (rampLength / 2) * Math.sin(Math.abs(rampAngle))
-      + (rampThickness / 2) * Math.cos(rampAngle),
-    -4.5,
-  ],
-  size: [2, rampThickness, rampLength],
-  angle: rampAngle,
-  color: "#4ca96a",
-});
+  course.obstacles.forEach((obstacle, index) => {
+    world.add({
+      ...obstacle,
+      obstacle: true,
+      id: `${course.id}-obstacle-${index}`,
+    });
+  });
 }

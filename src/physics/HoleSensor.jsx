@@ -1,50 +1,53 @@
 // src/physics/HoleSensor.jsx
 
-import { RigidBody, CuboidCollider } from "@react-three/rapier";
+import { useRef } from "react";
+import { useBeforePhysicsStep } from "@react-three/rapier";
+
 import useGameStore from "../store/useGameStore";
 
 export default function HoleSensor({ hole, ballRef }) {
-  function handleIntersection({ other }) {
-    if (!other.rigidBodyObject?.userData?.isGolfBall) {
-      return;
-    }
+  const triggeredRef = useRef(false);
+
+  useBeforePhysicsStep(() => {
+    if (triggeredRef.current) return;
 
     const ball = ballRef.current;
     if (!ball) return;
 
+    const state = useGameStore.getState();
+
+    if (state.completed || state.gameComplete) return;
+
     const position = ball.translation();
     const velocity = ball.linvel();
+
+    const [holeX, holeY, holeZ] = hole.position;
+
+    const dx = position.x - holeX;
+    const dz = position.z - holeZ;
+
+    const distance = Math.hypot(dx, dz);
 
     const horizontalSpeed = Math.hypot(
       velocity.x,
       velocity.z
     );
 
-    // Require the ball to be inside the cup,
-    // rather than merely passing over the opening.
-    if (position.y > -0.25) return;
+    // The ball must be inside the cup.
+    const insideCup = distance < hole.radius * 0.75;
 
-    // Ignore balls passing through too quickly.
-    if (horizontalSpeed > 3) return;
+    // The ball must have fallen below the green.
+    const belowSurface = position.y < holeY - 0.1;
 
-    useGameStore.getState().completeHole();
-  }
+    // Avoid completing when a fast ball passes over.
+    const slowEnough = horizontalSpeed < 4;
 
-  return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
-      position={[
-        hole.position[0],
-        -0.52,
-        hole.position[2],
-      ]}
-    >
-      <CuboidCollider
-        args={[0.2, 0.15, 0.2]}
-        sensor
-        onIntersectionEnter={handleIntersection}
-      />
-    </RigidBody>
-  );
+    if (insideCup && belowSurface && slowEnough) {
+      triggeredRef.current = true;
+
+      state.completeHole();
+    }
+  });
+
+  return null;
 }

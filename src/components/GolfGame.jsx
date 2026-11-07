@@ -1,104 +1,400 @@
 // src/components/GolfGame.jsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-
-import { setupGame } from "../ecs/setupGame";
-import GolfScene from "./GolfScene";
+import ShotPowerMeter from "./ShotPowerMeter";
+import { courses } from "../courses";
 import useGameStore from "../store/useGameStore";
+import MenuScreen from "../screens/MenuScreen";
+import CoursePreviewScreen from "../screens/CoursePreviewScreen";
+import CourseSession from "./CourseSession";
+import CourseSelectScreen from "../screens/CourseSelectScreen";
+//import GameCompleteScreen from "../screens/GameCompleteScreen";
+//import PauseScreen from "../screens/PauseScreen";
+//import ScorecardScreen from "../screens/ScorecardScreen";
+//import HowToPlayScreen from "../screens/HowToPlayScreen";
+//import SettingsScreen from "../screens/SettingsScreen";
+
+
+function SpinControls() {
+    const topSpin = useGameStore(
+        (s) => s.topSpin
+    );
+
+    const sideSpin = useGameStore(
+        (s) => s.sideSpin
+    );
+
+    const setTopSpin = useGameStore(
+        (s) => s.setTopSpin
+    );
+
+    const setSideSpin = useGameStore(
+        (s) => s.setSideSpin
+    );
+
+    const resetSpin = useGameStore(
+        (s) => s.resetSpin
+    );
+
+    return (
+        <div className="spin-controls">
+            <h3>Ball Spin</h3>
+
+            <label>
+                Topspin / Backspin:
+                {" "}
+                {Math.round(topSpin * 100)}%
+            </label>
+
+            <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.1"
+                value={topSpin}
+                onChange={(event) =>
+                    setTopSpin(Number(event.target.value))
+                }
+            />
+
+            <label>
+                Sidespin:
+                {" "}
+                {Math.round(sideSpin * 100)}%
+            </label>
+
+            <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.1"
+                value={sideSpin}
+                onChange={(event) =>
+                    setSideSpin(Number(event.target.value))
+                }
+            />
+
+            <button
+                type="button"
+                className="secondary-button"
+                onClick={resetSpin}
+            >
+                Reset Spin
+            </button>
+        </div>
+    );
+}
+
 
 export default function GolfGame() {
-  const [sessionId, setSessionId] = useState(0);
+    const [screen, setScreen] = useState("menu");
+    const [previewIndex, setPreviewIndex] = useState(0);
 
-  // Initialize the ECS world once for this game.
-  useState(() => {
-    setupGame();
-    return true;
-  });
+    const courseIndex = useGameStore((s) => s.courseIndex);
+    const sessionId = useGameStore((s) => s.sessionId);
 
-  const strokes = useGameStore((s) => s.strokes);
-  const power = useGameStore((s) => s.power);
-  const aimAngle = useGameStore((s) => s.aimAngle);
-  const charging = useGameStore((s) => s.charging);
-  const completed = useGameStore((s) => s.completed);
+    const strokes = useGameStore((s) => s.strokes);
+    const results = useGameStore((s) => s.results);
+    const completed = useGameStore((s) => s.completed);
+    const gameComplete = useGameStore((s) => s.gameComplete);
 
-  const setPower = useGameStore((s) => s.setPower);
-  const resetGame = useGameStore((s) => s.resetGame);
+    const power = useGameStore((s) => s.power);
+    const charging = useGameStore((s) => s.charging);
+    const aimAngle = useGameStore((s) => s.aimAngle);
+    const cameraMode = useGameStore((s) => s.cameraMode);
 
-  const degrees =
-    ((Math.round((aimAngle * 180) / Math.PI) % 360)
-      + 360) % 360;
+    const setPower = useGameStore((s) => s.setPower);
+    const nextCourse = useGameStore((s) => s.nextCourse);
+    const restartCourse = useGameStore((s) => s.restartCourse);
+    const resetGame = useGameStore((s) => s.resetGame);
+    const toggleCameraMode = useGameStore(
+        (s) => s.toggleCameraMode
+    );
 
-  function handleRestart() {
-    resetGame();
-    setSessionId((id) => id + 1);
-  }
+    const course = courses[courseIndex];
 
-  return (
-    <div className="game">
-      <Canvas
-        key={sessionId}
-        shadows
-        camera={{
-          position: [0, 5, 15],
-          fov: 55,
-          near: 0.1,
-          far: 100,
-        }}
-      >
-        <GolfScene />
-      </Canvas>
+    const totalStrokes = results.reduce(
+        (sum, result) => sum + result.strokes,
+        0
+    );
 
-      <div className="hud">
-        <h2>Mini Golf</h2>
+    const totalPar = results.reduce(
+        (sum, result) => sum + result.par,
+        0
+    );
 
-        <p>Strokes: {strokes}</p>
-        <p>Aim: {degrees}°</p>
+    const difference = totalStrokes - totalPar;
 
-        <label>
-          Power: {Math.round(power * 100)}%
-        </label>
+    const degrees =
+        ((Math.round((aimAngle * 180) / Math.PI) % 360) +
+            360) %
+        360;
 
-        <input
-          type="range"
-          min="0.1"
-          max="1"
-          step="0.05"
-          value={power}
-          disabled={charging || completed}
-          onChange={(e) =>
-            setPower(Number(e.target.value))
-          }
-        />
+    const isLastCourse =
+        courseIndex === courses.length - 1;
 
-        <div className="power-track">
-          <div
-            className="power-fill"
-            style={{ width: `${power * 100}%` }}
-          />
+    useEffect(() => {
+        function handleKeyDown(event) {
+            if (screen !== "play" || gameComplete) return;
+            if (event.code !== "KeyV" || event.repeat) return;
+
+            const target = event.target;
+            const tag = target?.tagName;
+
+            if (
+                tag === "INPUT" ||
+                tag === "TEXTAREA" ||
+                tag === "SELECT" ||
+                target?.isContentEditable
+            ) {
+                return;
+            }
+
+            event.preventDefault();
+            toggleCameraMode();
+        }
+
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [screen, gameComplete, toggleCameraMode]);
+
+    function handleNewGame() {
+        resetGame();
+        setScreen("menu");
+    }
+
+    function handleReturnToSelection() {
+        setScreen("select");
+    }
+
+    if (screen === "menu") {
+        return (
+            <div className="game">
+                <MenuScreen
+                    onPlay={() => setScreen("select")}
+                    onSelectCourses={() => setScreen("select")}
+                />
+            </div>
+        );
+    }
+
+    if (screen === "select") {
+        return (
+            <div className="game">
+                <CourseSelectScreen
+                    onPreview={(index) => {
+                        setPreviewIndex(index);
+                        setScreen("preview");
+                    }}
+                    onBack={() => setScreen("menu")}
+                />
+            </div>
+        );
+    }
+
+    if (screen === "preview") {
+        return (
+            <div className="game">
+                <CoursePreviewScreen
+                    courseIndex={previewIndex}
+                    onBack={() => setScreen("select")}
+                    onPlay={() => setScreen("play")}
+                />
+            </div>
+        );
+    }
+
+    if (!course && !gameComplete) {
+        return (
+            <div className="game">
+                <div className="hud">
+                    <h2>Course not found</h2>
+
+                    <button
+                        type="button"
+                        onClick={handleNewGame}
+                    >
+                        Select Course
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="game">
+            {!gameComplete && (
+                <Canvas
+                    key={`${courseIndex}-${sessionId}`}
+                    shadows
+                    camera={{
+                        position: [0, 5, 15],
+                        fov: 55,
+                        near: 0.1,
+                        far: 100,
+                    }}
+                >
+                    <CourseSession courseIndex={courseIndex} />
+                </Canvas>
+            )}
+
+            {!gameComplete && (
+                <div className="hud">
+                    <h2>Mini Golf</h2>
+
+                    <p>
+                        Course {courseIndex + 1} / {courses.length}
+                    </p>
+
+                    <h3>{course.name}</h3>
+
+                    <p>Par: {course.par}</p>
+                    <p>Strokes: {strokes}</p>
+
+                    {!completed ? (
+                        <>
+                            <p>Aim: {degrees}°</p>
+
+
+
+                            <input
+                                type="range"
+                                min="0.1"
+                                max="1"
+                                step="0.05"
+                                value={power}
+                                disabled={charging}
+                                onChange={(event) =>
+                                    setPower(Number(event.target.value))
+                                }
+                            />
+
+<ShotPowerMeter />
+
+                            <SpinControls />
+
+                            <button
+                                type="button"
+                                className="secondary-button"
+                                onClick={toggleCameraMode}
+                            >
+                                {cameraMode === "follow"
+                                    ? "Course Overview"
+                                    : "Follow Ball"}
+                            </button>
+
+                            <div className="controls-help">
+                                <p>Right drag: Aim</p>
+                                <p>Left hold/release: Shoot</p>
+                                <p>Mouse wheel: Zoom</p>
+                                <p>Space: Shoot</p>
+                                <p>R: Reset ball</p>
+                                <p>V: Toggle camera</p>
+                                <p>J: Jump shot</p>
+                                <p>Shift + Left hold/release: Charged jump shot</p>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="completion">
+                            <h3>Course Complete!</h3>
+
+                            <p>
+                                {strokes} strokes — Par {course.par}
+                            </p>
+
+                            <button
+                                type="button"
+                                onClick={nextCourse}
+                            >
+                                {isLastCourse
+                                    ? "View Scorecard"
+                                    : "Next Course"}
+                            </button>
+                        </div>
+                    )}
+
+                    <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={restartCourse}
+                    >
+                        Restart Course
+                    </button>
+
+                    <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={handleReturnToSelection}
+                    >
+                        Course Selection
+                    </button>
+                </div>
+            )}
+
+            {gameComplete && (
+                <div className="scorecard-screen">
+                    <div className="scorecard">
+                        <h1>All Courses Complete!</h1>
+
+                        <p>
+                            Completed {results.length} courses
+                        </p>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Par</th>
+                                    <th>Strokes</th>
+                                    <th>+/-</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {results.map((result) => {
+                                    const diff =
+                                        result.strokes - result.par;
+
+                                    return (
+                                        <tr key={result.courseId}>
+                                            <td>{result.name}</td>
+                                            <td>{result.par}</td>
+                                            <td>{result.strokes}</td>
+                                            <td>
+                                                {diff > 0 ? "+" : ""}
+                                                {diff}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+
+                            <tfoot>
+                                <tr>
+                                    <th>Total</th>
+                                    <th>{totalPar}</th>
+                                    <th>{totalStrokes}</th>
+                                    <th>
+                                        {difference > 0 ? "+" : ""}
+                                        {difference}
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <button
+                            type="button"
+                            onClick={handleNewGame}
+                        >
+                            Course Selection
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
-
-        {charging && <p>Charging shot...</p>}
-
-        {completed ? (
-          <div className="completion">
-            <h3>Hole Complete!</h3>
-            <p>Completed in {strokes} strokes.</p>
-
-            <button onClick={handleRestart}>
-              Play Again
-            </button>
-          </div>
-        ) : (
-          <div className="controls-help">
-            <p>Right drag: Aim</p>
-            <p>Left hold/release: Shoot</p>
-            <p>Mouse wheel: Zoom</p>
-            <p>Space: Shoot</p>
-            <p>R: Reset ball</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
 }

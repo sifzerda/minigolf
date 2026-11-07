@@ -2,11 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+
 import useGameStore from "../store/useGameStore";
-import { shootBall, resetBall } from "../ecs/systems/ShotSystem";
+import {
+  shootBall,
+  resetBall,
+} from "../ecs/systems/ShotSystem";
 
 const MAX_CHARGE_TIME = 1.5;
 const ROTATION_SENSITIVITY = 0.005;
+const SPIN_STEP = 0.2;
+
+const clamp = (value, min, max) =>
+  Math.max(min, Math.min(max, value));
 
 export default function GolfControls({
   ballRef,
@@ -18,33 +26,96 @@ export default function GolfControls({
   const dragging = useRef(false);
   const charging = useRef(false);
   const chargeStart = useRef(0);
+  const jumpCharge = useRef(false);
 
   useFrame(() => {
     if (!charging.current) return;
 
-    const elapsed = (performance.now() - chargeStart.current) / 1000;
-    const power = Math.min(1, Math.max(0.1, elapsed / MAX_CHARGE_TIME));
+    const elapsed =
+      (performance.now() - chargeStart.current) / 1000;
+
+    const power = clamp(
+      elapsed / MAX_CHARGE_TIME,
+      0.1,
+      1
+    );
+
     useGameStore.getState().setPower(power);
   });
 
   useEffect(() => {
     const canvas = gl.domElement;
 
+    function canShoot() {
+      const state = useGameStore.getState();
+
+      return (
+        !state.completed &&
+        !state.gameComplete &&
+        settledRef.current &&
+        Boolean(ballRef.current)
+      );
+    }
+
+    function startCharge(jump) {
+      if (!canShoot() || charging.current) return;
+
+      charging.current = true;
+      jumpCharge.current = jump;
+      chargeStart.current = performance.now();
+
+      const state = useGameStore.getState();
+
+      state.setChargeMode(
+        jump ? "jump" : "normal"
+      );
+
+      state.setPower(0.1);
+      state.setCharging(true);
+    }
+
+    function releaseCharge() {
+      if (!charging.current) return;
+
+      charging.current = false;
+
+      const state = useGameStore.getState();
+
+      const elapsed =
+        (performance.now() - chargeStart.current) /
+        1000;
+
+      const power = clamp(
+        elapsed / MAX_CHARGE_TIME,
+        0.1,
+        1
+      );
+
+      state.setPower(power);
+      state.setCharging(false);
+
+      shootBall(
+        ballRef.current,
+        power,
+        state.aimAngle,
+        settledRef,
+        jumpCharge.current
+      );
+
+      state.setChargeMode("normal");
+      jumpCharge.current = false;
+    }
+
     function onPointerDown(event) {
       if (event.target !== canvas) return;
 
       if (event.button === 2) {
         dragging.current = true;
+        return;
       }
 
       if (event.button === 0) {
-        if (useGameStore.getState().completed) return;
-
-        charging.current = true;
-        chargeStart.current = performance.now();
-
-        useGameStore.getState().setPower(0.1);
-        useGameStore.getState().setCharging(true);
+        startCharge(event.shiftKey);
       }
     }
 
@@ -52,7 +123,11 @@ export default function GolfControls({
       if (!dragging.current) return;
 
       const state = useGameStore.getState();
-      state.setAimAngle(state.aimAngle - event.movementX * ROTATION_SENSITIVITY);
+
+      state.setAimAngle(
+        state.aimAngle -
+          event.movementX * ROTATION_SENSITIVITY
+      );
     }
 
     function onPointerUp(event) {
@@ -60,26 +135,36 @@ export default function GolfControls({
         dragging.current = false;
       }
 
-      if (event.button === 0 && charging.current) {
-        charging.current = false;
-
-        const state = useGameStore.getState();
-        state.setCharging(false);
-
-        shootBall(ballRef.current, state.power, state.aimAngle, settledRef);
+      if (event.button === 0) {
+        releaseCharge();
       }
     }
 
     function onWheel(event) {
       if (event.target !== canvas) return;
+
       event.preventDefault();
 
       const state = useGameStore.getState();
-      state.setCameraDistance(state.cameraDistance + event.deltaY * 0.01);
+
+      state.setCameraDistance(
+        state.cameraDistance +
+          event.deltaY * 0.01
+      );
     }
 
     function onKeyDown(event) {
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, button")) {
+      const target = event.target;
+
+      if (
+        target instanceof HTMLElement &&
+        (
+          target.closest(
+            "input, textarea, select, button"
+          ) ||
+          target.isContentEditable
+        )
+      ) {
         return;
       }
 
@@ -87,16 +172,72 @@ export default function GolfControls({
 
       const state = useGameStore.getState();
 
-      if (event.code === "Space") {
+      // Keyboard action registry.
+      const actions = {
+        KeyW: () =>
+          state.setTopSpin(
+            state.topSpin + SPIN_STEP
+          ),
+
+        KeyS: () =>
+          state.setTopSpin(
+            state.topSpin - SPIN_STEP
+          ),
+
+        KeyQ: () =>
+          state.setSideSpin(
+            state.sideSpin - SPIN_STEP
+          ),
+
+        KeyE: () =>
+          state.setSideSpin(
+            state.sideSpin + SPIN_STEP
+          ),
+
+        KeyX: () => state.resetSpin(),
+
+        Space: () => {
+          if (charging.current) return;
+
+          shootBall(
+            ballRef.current,
+            state.power,
+            state.aimAngle,
+            settledRef,
+            false
+          );
+        },
+
+        KeyJ: () => {
+          if (charging.current) return;
+
+          shootBall(
+            ballRef.current,
+            state.power,
+            state.aimAngle,
+            settledRef,
+            true
+          );
+        },
+
+        KeyR: () =>
+          resetBall(
+            ballRef.current,
+            startPosition,
+            settledRef
+          ),
+      };
+
+      const action = actions[event.code];
+
+      if (!action) return;
+
+      if (event.code === "Space" ||
+          event.code === "KeyJ") {
         event.preventDefault();
-
-        if (charging.current) return;
-        shootBall(ballRef.current, state.power, state.aimAngle, settledRef);
       }
 
-      if (event.code === "KeyR") {
-        resetBall(ballRef.current, startPosition, settledRef);
-      }
+      action();
     }
 
     function onContextMenu(event) {
@@ -108,28 +249,87 @@ export default function GolfControls({
     function onBlur() {
       dragging.current = false;
       charging.current = false;
-      useGameStore.getState().setCharging(false);
+      jumpCharge.current = false;
+
+      const state = useGameStore.getState();
+
+      state.setChargeMode("normal");
+      state.setCharging(false);
     }
 
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("wheel", onWheel, { passive: false });
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("blur", onBlur);
-    canvas.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener(
+      "pointerdown",
+      onPointerDown
+    );
+
+    window.addEventListener(
+      "pointermove",
+      onPointerMove
+    );
+
+    window.addEventListener(
+      "pointerup",
+      onPointerUp
+    );
+
+    window.addEventListener(
+      "wheel",
+      onWheel,
+      { passive: false }
+    );
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    window.addEventListener(
+      "blur",
+      onBlur
+    );
+
+    canvas.addEventListener(
+      "contextmenu",
+      onContextMenu
+    );
 
     return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("blur", onBlur);
-      canvas.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener(
+        "pointerdown",
+        onPointerDown
+      );
+
+      window.removeEventListener(
+        "pointermove",
+        onPointerMove
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        onPointerUp
+      );
+
+      window.removeEventListener(
+        "wheel",
+        onWheel
+      );
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+
+      window.removeEventListener(
+        "blur",
+        onBlur
+      );
+
+      canvas.removeEventListener(
+        "contextmenu",
+        onContextMenu
+      );
     };
-  }, [gl, ballRef, settledRef,startPosition]);
+  }, [gl, ballRef, settledRef, startPosition]);
 
   return null;
 }
-

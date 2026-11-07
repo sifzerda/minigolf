@@ -3,9 +3,8 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import useGameStore from "../store/useGameStore";
-import { isBallStopped } from "../ecs/systems/ShotSystem";
 
-export default function AimGuide({ ballRef }) {
+export default function AimGuide({ ballRef, settledRef }) {
   const guideRef = useRef(null);
 
   useFrame(() => {
@@ -16,8 +15,7 @@ export default function AimGuide({ ballRef }) {
 
     const state = useGameStore.getState();
 
-    guide.visible =
-      !state.completed && isBallStopped(ball);
+    guide.visible = !state.completed && settledRef.current;
 
     if (!guide.visible) return;
 

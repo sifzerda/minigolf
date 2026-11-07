@@ -10,6 +10,7 @@ const ROTATION_SENSITIVITY = 0.005;
 
 export default function GolfControls({
   ballRef,
+  settledRef,
   startPosition,
 }) {
   const { gl } = useThree();
@@ -65,7 +66,7 @@ export default function GolfControls({
         const state = useGameStore.getState();
         state.setCharging(false);
 
-        shootBall(ballRef.current, state.power, state.aimAngle);
+        shootBall(ballRef.current, state.power, state.aimAngle, settledRef);
       }
     }
 
@@ -90,11 +91,11 @@ export default function GolfControls({
         event.preventDefault();
 
         if (charging.current) return;
-        shootBall(ballRef.current, state.power, state.aimAngle);
+        shootBall(ballRef.current, state.power, state.aimAngle, settledRef);
       }
 
       if (event.code === "KeyR") {
-        resetBall(ballRef.current, startPosition);
+        resetBall(ballRef.current, startPosition, settledRef);
       }
     }
 
@@ -127,7 +128,7 @@ export default function GolfControls({
       window.removeEventListener("blur", onBlur);
       canvas.removeEventListener("contextmenu", onContextMenu);
     };
-  }, [gl, ballRef, startPosition]);
+  }, [gl, ballRef, settledRef,startPosition]);
 
   return null;
 }

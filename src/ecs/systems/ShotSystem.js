@@ -3,7 +3,6 @@
 import useGameStore from "../../store/useGameStore";
 
 const SHOT_IMPULSE = 2.5;
-const STOP_THRESHOLD = 0.15;
 
 export function getShotDirection(angle) {
   return {
@@ -13,41 +12,31 @@ export function getShotDirection(angle) {
   };
 }
 
-export function isBallStopped(ball) {
-  if (!ball) return false;
-
-  const velocity = ball.linvel();
-  const angular = ball.angvel();
-
-  const speed = Math.hypot(
-    velocity.x,
-    velocity.y,
-    velocity.z
-  );
-
-  const spin = Math.hypot(
-    angular.x,
-    angular.y,
-    angular.z
-  );
-
-  return (
-    speed < STOP_THRESHOLD &&
-    spin < 0.5
-  );
+export function isBallStopped(ball, settledRef) {
+  return Boolean(ball && settledRef?.current);
 }
 
-export function shootBall(ball, power, angle) {
-  if (!ball) return false;
-
+export function shootBall(
+  ball,
+  power,
+  angle,
+  settledRef
+) {
   const state = useGameStore.getState();
 
-  if (state.completed || !isBallStopped(ball)) {
+  if (
+    !isBallStopped(ball, settledRef) ||
+    state.completed
+  ) {
     return false;
   }
 
   const direction = getShotDirection(angle);
-  const impulse = power * SHOT_IMPULSE;
+  const impulse = Math.max(0.1, Math.min(1, power))
+    * SHOT_IMPULSE;
+
+  // Prevent another shot until the ball settles.
+  settledRef.current = false;
 
   ball.wakeUp();
 
@@ -61,11 +50,10 @@ export function shootBall(ball, power, angle) {
   );
 
   state.recordStroke();
-
   return true;
 }
 
-export function resetBall(ball, position) {
+export function resetBall(ball, position, settledRef) {
   if (!ball) return;
 
   ball.setTranslation(
@@ -84,5 +72,6 @@ export function resetBall(ball, position) {
     { x: 0, y: 0, z: 0, w: 1 },
     true
   );
-}
 
+  if (settledRef) settledRef.current = false;
+}

@@ -5,6 +5,8 @@ import {
   BallCollider,
 } from "@react-three/rapier";
 
+import { PHYSICS } from "../ecs/constants/physics";
+
 export default function GolfBall({ entity, ballRef }) {
   return (
     <RigidBody
@@ -12,10 +14,10 @@ export default function GolfBall({ entity, ballRef }) {
       userData={{ isGolfBall: true }}
       position={entity.position}
       colliders={false}
-      restitution={0.15}
-      friction={0.85}
-      linearDamping={0.65}
-      angularDamping={1.2}
+      restitution={PHYSICS.restitution}
+      friction={PHYSICS.friction}
+      linearDamping={0.05}
+      angularDamping={0.3}
       ccd
     >
       <BallCollider args={[entity.radius]} />

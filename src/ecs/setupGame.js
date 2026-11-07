@@ -3,31 +3,54 @@
 import { world } from "./world";
 
 export function setupGame() {
-  // Clear previous entities.
   for (const entity of [...world.entities]) {
     world.remove(entity);
   }
 
-  // Golf ball
   world.add({
     ball: true,
     position: [0, 0.25, 8],
     radius: 0.25,
-    active: true,
   });
 
-  // Hole
   world.add({
     hole: true,
     position: [0, 0, -8],
-    radius: 0.35,
+    radius: 0.43,
   });
 
-  // Sample obstacle
+  // Sand region
   world.add({
-    obstacle: true,
-    type: "bumper",
-    position: [1.5, 0.4, 0],
-    radius: 0.4,
+    surface: "sand",
+    position: [2.5, 0, 1],
+    size: [2, 3],
+    color: "#d8bc7a",
   });
+
+  // Ice region
+  world.add({
+    surface: "ice",
+    position: [-2.5, 0, -2],
+    size: [2, 3],
+    color: "#9be8ff",
+  });
+
+  // Raised ramp, positioned off the main path.
+const rampLength = 3;
+const rampThickness = 0.2;
+const rampAngle = -0.2;
+
+world.add({
+  ramp: true,
+  surface: "grass",
+  position: [
+    2.5,
+    (rampLength / 2) * Math.sin(Math.abs(rampAngle))
+      + (rampThickness / 2) * Math.cos(rampAngle),
+    -4.5,
+  ],
+  size: [2, rampThickness, rampLength],
+  angle: rampAngle,
+  color: "#4ca96a",
+});
 }

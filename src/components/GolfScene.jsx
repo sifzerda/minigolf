@@ -24,10 +24,11 @@ import FollowCamera from "../renderers/FollowCamera";
 import AimGuide from "../renderers/AimGuide";
 
 import GolfControls from "./GolfControls";
-import LightingRenderer from "./LightingRenderer";
-import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
 
+import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
 import HoleFlag from "../renderers/HoleFlag";
+
+import TerrainRenderer from "../renderers/TerrainRenderer";
 
 const FLAG_COLORS = {
   garden: "#ff4545",
@@ -47,25 +48,32 @@ export default function GolfScene({ course }) {
 
   if (!course || !ball || !hole) return null;
 
+  const theme = course.environment ?? "garden";
+
   return (
     <>
-      <LightingRenderer theme={theme} />
+      {/* Environment includes lighting */}
+      <EnvironmentRenderer theme={theme} />
 
-      <EnvironmentRenderer
-        theme={course.environment ?? "garden"}
-      />
-
+      {/* Decorative hole flag */}
       <HoleFlag
         position={course.hole.position}
-        color={
-          FLAG_COLORS[course.environment] ??
-          FLAG_COLORS.garden
-        }
+        color={FLAG_COLORS[theme] ?? FLAG_COLORS.garden}
       />
 
-      <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
+      <Physics
+        gravity={[0, -9.81, 0]}
+        timeStep={1 / 60}
+      >
+        {/* Procedural terrain */}
+        {course.terrain && (
+          <TerrainRenderer terrain={course.terrain} />
+        )}
+
+        {/* Existing course geometry */}
         <CourseGeometryRenderer course={course} />
 
+        {/* Surface regions */}
         {[...surfaceQuery].map((entity) => (
           <SurfaceRenderer
             key={entity.id}
@@ -73,6 +81,7 @@ export default function GolfScene({ course }) {
           />
         ))}
 
+        {/* Ramps */}
         {[...rampQuery].map((entity) => (
           <RampRenderer
             key={entity.id}
@@ -80,6 +89,7 @@ export default function GolfScene({ course }) {
           />
         ))}
 
+        {/* Obstacles */}
         {[...obstacleQuery].map((entity) => (
           <ObstacleRenderer
             key={entity.id}
@@ -88,31 +98,39 @@ export default function GolfScene({ course }) {
           />
         ))}
 
+        {/* Golf ball */}
         <GolfBall
           entity={ball}
           ballRef={ballRef}
         />
 
+        {/* Ball physics */}
         <BallPhysicsSystem
           ballRef={ballRef}
           settledRef={settledRef}
           activeSurfaceRef={activeSurfaceRef}
         />
 
+        {/* Hole detection */}
         <HoleSensor
           hole={hole}
           ballRef={ballRef}
         />
 
+        {/* Shot trajectory */}
         <AimGuide
           ballRef={ballRef}
           settledRef={settledRef}
         />
-
       </Physics>
 
-      <FollowCamera ballRef={ballRef} course={course} />
+      {/* Camera */}
+      <FollowCamera
+        ballRef={ballRef}
+        course={course}
+      />
 
+      {/* Player controls */}
       <GolfControls
         ballRef={ballRef}
         settledRef={settledRef}

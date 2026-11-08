@@ -896,7 +896,7 @@ const OBSTACLE_COMPONENTS = {
   rotatingGate: RotatingGate,
 };
 
-export default function ObstacleRenderer({ entity }) {
+export default function ObstacleRenderer({ entity, ballRef }) {
   const Component = OBSTACLE_COMPONENTS[entity.type];
 
   if (!Component) return null;

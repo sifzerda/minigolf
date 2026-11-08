@@ -1,6 +1,8 @@
 // src/ecs/setupGame.js
 
 import { world } from "./world";
+import { getTerrainHeight } from "../terrain/TerrainFeatures";
+import { BALL_RADIUS } from "./constants/physics";
 
 export function clearGame() {
   for (const entity of [...world.entities]) {
@@ -9,16 +11,32 @@ export function clearGame() {
 }
 
 export function setupGame(course) {
+const [startX, startY, startZ] = course.ballStart;
+const ballPosition = course.terrain
+  ? [
+      startX,
+      getTerrainHeight(
+        startX,
+        startZ,
+        course.terrain
+      ) + BALL_RADIUS + 0.05,
+      startZ,
+    ]
+  : [startX, startY, startZ];
+
+
   if (!course) {
     throw new Error("A valid course is required");
   }
 
   clearGame();
 
+  
+
   world.add({
     id: `${course.id}-ball`,
     ball: true,
-    position: [...course.ballStart],
+    position: ballPosition,
     radius: 0.25,
   });
 

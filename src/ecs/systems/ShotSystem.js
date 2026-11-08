@@ -14,6 +14,13 @@ const SPIN = {
   minSpeed: 0.12,
 };
 
+const SURFACE_SPIN = {
+  grass: 1,
+  sand: 0.3,
+  ice: 1.4,
+  concrete: 0.85,
+};
+
 const clamp = (value, min, max) =>
   Math.max(min, Math.min(max, value));
 
@@ -47,9 +54,10 @@ export function applyBallSpin(
   grounded,
   surface = "grass"
 ) {
-  const spin = activeSpin.get(ball);
+  if (!ball || dt <= 0) return;
 
-  if (!spin || !ball || dt <= 0) return;
+  const spin = activeSpin.get(ball);
+  if (!spin) return;
 
   spin.elapsed += dt;
 
@@ -58,24 +66,9 @@ export function applyBallSpin(
     return;
   }
 
-  // Spin decays over time.
-  const strength =
-    Math.pow(1 - spin.elapsed / SPIN.duration, 2);
-
-  // Ice retains spin effects more readily.
-  // Sand strongly suppresses them.
-  const surfaceFactor = {
-    grass: 1,
-    sand: 0.3,
-    ice: 1.4,
-    concrete: 0.85,
-  }[surface] ?? 1;
-
-  // Do not apply rolling forces while airborne.
   if (!grounded) return;
 
   const velocity = ball.linvel();
-
   const speed = Math.hypot(
     velocity.x,
     velocity.z
@@ -86,10 +79,16 @@ export function applyBallSpin(
     return;
   }
 
+  const strength = (
+    1 - spin.elapsed / SPIN.duration
+  ) ** 2;
+
+  const factor =
+    SURFACE_SPIN[surface] ?? 1;
+
   const forwardX = velocity.x / speed;
   const forwardZ = velocity.z / speed;
 
-  // Right perpendicular to current travel.
   const rightX = -forwardZ;
   const rightZ = forwardX;
 
@@ -97,29 +96,27 @@ export function applyBallSpin(
     spin.side *
     SPIN.sideAcceleration *
     strength *
-    surfaceFactor;
+    factor;
 
   const forwardAcceleration =
     spin.forward *
     SPIN.forwardAcceleration *
     strength *
-    surfaceFactor;
+    factor;
 
-  const mass = ball.mass();
+  const massDt = ball.mass() * dt;
 
   ball.applyImpulse(
     {
-      x:
-        mass *
-        dt *
-        (rightX * sideAcceleration +
-          forwardX * forwardAcceleration),
+      x: massDt * (
+        rightX * sideAcceleration +
+        forwardX * forwardAcceleration
+      ),
       y: 0,
-      z:
-        mass *
-        dt *
-        (rightZ * sideAcceleration +
-          forwardZ * forwardAcceleration),
+      z: massDt * (
+        rightZ * sideAcceleration +
+        forwardZ * forwardAcceleration
+      ),
     },
     true
   );
@@ -149,8 +146,6 @@ export function shootBall(
     ? getJumpImpulse(power)
     : 0;
 
-  settledRef.current = false;
-
   const forward = clamp(
     state.topSpin ?? 0,
     -1,
@@ -172,6 +167,8 @@ export function shootBall(
   } else {
     clearBallSpin(ball);
   }
+
+  settledRef.current = false;
 
   ball.wakeUp();
 

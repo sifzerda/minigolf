@@ -3,137 +3,97 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
+import { Ray } from "@dimforge/rapier3d-compat";
+
 import {
   BufferGeometry,
   Float32BufferAttribute,
-  Vector3,
+  DynamicDrawUsage,
 } from "three";
 
 import useGameStore from "../store/useGameStore";
-import { BALL_RADIUS, PHYSICS } from "../ecs/constants/physics";
-import { resolveSurface } from "../ecs/systems/SurfaceSystem";
-import {
-  getShotDirection,
-  getShotImpulse,
-} from "../ecs/systems/ShotSystem";
+import { BALL_RADIUS } from "../ecs/constants/physics";
+import { getShotDirection } from "../ecs/systems/ShotSystem";
+import { renderActivity } from "../utils/renderActivity";
 
-const MAX_POINTS = 240;
-const MAX_BOUNCES = 2;
+// Guide appearance
+const GUIDE_LENGTH = 3;
+const GUIDE_STEP = 0.12;
+const GUIDE_HEIGHT = 0.07;
+const GUIDE_SIZE = 0.085;
 
-const STEP = 0.12;
-const EPSILON = 0.015;
-const MIN_DISTANCE = 0.02;
+// Terrain sampling
+const MAX_STEP_UP = 0.35;
+const MAX_STEP_DOWN = 0.6;
+const RAY_MARGIN = 0.08;
 
-// Calibration factor for approximate shot distance.
-const DISTANCE_MULTIPLIER = 6;
+// Performance
+const REFRESH_INTERVAL = 200;
+const POSITION_EPSILON = 0.005;
 
-const BOUNCE_RETENTION = 0.6;
-const SPIN_CURVE = 0.012;
-const TOPSPIN_FACTOR = 0.3;
+const MAX_POINTS =
+  Math.ceil(GUIDE_LENGTH / GUIDE_STEP) + 1;
 
-const UP = { x: 0, y: 0, z: 0, w: 1 };
+const DOWN = { x: 0, y: -1, z: 0 };
 
-const clamp = (value, min, max) =>
-  Math.max(min, Math.min(max, value));
-
-function makeGeometry() {
+function createGeometry() {
   const geometry = new BufferGeometry();
 
-  geometry.setAttribute(
-    "position",
-    new Float32BufferAttribute(
-      new Float32Array(MAX_POINTS * 3),
-      3
-    )
+  const attribute = new Float32BufferAttribute(
+    new Float32Array(MAX_POINTS * 3),
+    3
   );
 
+  attribute.setUsage(DynamicDrawUsage);
+
+  geometry.setAttribute("position", attribute);
   geometry.setDrawRange(0, 0);
 
   return geometry;
 }
 
-function getResistance(surface) {
-  return (
-    PHYSICS.surfaces[surface]?.resistance ??
-    PHYSICS.surfaces.grass.resistance
-  );
-}
-
-function estimateDistance(power, topSpin, surface) {
-  const impulse = getShotImpulse(power);
-
-  const resistance = getResistance(surface);
-
-  const surfaceFactor = clamp(
-    PHYSICS.surfaces.grass.resistance /
-      Math.max(0.05, resistance),
-    0.3,
-    2.5
-  );
-
-  const spinFactor = clamp(
-    1 + topSpin * TOPSPIN_FACTOR,
-    0.5,
-    1.5
-  );
+function inputsChanged(previous, next) {
+  if (!previous) return true;
 
   return (
-    impulse *
-    DISTANCE_MULTIPLIER *
-    surfaceFactor *
-    spinFactor
+    previous.angle !== next.angle ||
+    Math.abs(previous.x - next.x) >
+      POSITION_EPSILON ||
+    Math.abs(previous.y - next.y) >
+      POSITION_EPSILON ||
+    Math.abs(previous.z - next.z) >
+      POSITION_EPSILON
   );
-}
-
-function getHitNormal(hit) {
-  const normal = hit.normal1 ?? hit.normal;
-
-  if (!normal) return null;
-
-  const result = new Vector3(
-    normal.x,
-    0,
-    normal.z
-  );
-
-  if (result.lengthSq() < 0.0001) {
-    return null;
-  }
-
-  return result.normalize();
-}
-
-function reflect(direction, normal) {
-  return direction
-    .clone()
-    .addScaledVector(
-      normal,
-      -2 * direction.dot(normal)
-    )
-    .normalize();
 }
 
 export default function AimGuide({
   ballRef,
   settledRef,
 }) {
-  const { world, rapier } = useRapier();
+  const { world } = useRapier();
 
   const guideRef = useRef(null);
+  const previousInput = useRef(null);
+  const lastUpdate = useRef(0);
 
   const geometry = useMemo(
-    () => makeGeometry(),
+    () => createGeometry(),
     []
   );
 
-  const sphere = useMemo(
-    () => new rapier.Ball(BALL_RADIUS),
-    [rapier]
+  const attribute = useMemo(
+    () => geometry.getAttribute("position"),
+    [geometry]
   );
 
-  const points = useRef([]);
-
-  const lastInput = useRef(null);
+  const ray = useMemo(
+    () =>
+      new Ray(
+        { x: 0, y: 0, z: 0 },
+        DOWN
+      ),
+    []
+  );
 
   useEffect(() => {
     return () => geometry.dispose();
@@ -152,105 +112,73 @@ export default function AimGuide({
       !state.gameComplete &&
       Boolean(settledRef.current);
 
-    guide.visible = visible;
+    if (guide.visible !== visible) {
+      guide.visible = visible;
+      renderActivity.wake(100);
+    }
 
     if (!visible) {
-      lastInput.current = null;
+      previousInput.current = null;
       return;
     }
 
     const position = ball.translation();
 
-    const power = state.power;
-    const angle = state.aimAngle;
-    const topSpin = state.topSpin ?? 0;
-    const sideSpin = state.sideSpin ?? 0;
+    const input = {
+      angle: state.aimAngle,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+    };
 
-    // Recalculate only when relevant inputs change.
-    // Periodic refresh also accounts for moving obstacles.
     const now = performance.now();
 
-    const previous = lastInput.current;
-
     if (
-      previous &&
-      previous.power === power &&
-      previous.angle === angle &&
-      previous.topSpin === topSpin &&
-      previous.sideSpin === sideSpin &&
-      Math.abs(previous.x - position.x) < 0.001 &&
-      Math.abs(previous.y - position.y) < 0.001 &&
-      Math.abs(previous.z - position.z) < 0.001 &&
-      now - previous.time < 150
+      !inputsChanged(previousInput.current, input) &&
+      now - lastUpdate.current < REFRESH_INTERVAL
     ) {
       return;
     }
 
-    lastInput.current = {
-      power,
-      angle,
-      topSpin,
-      sideSpin,
-      x: position.x,
-      y: position.y,
-      z: position.z,
-      time: now,
-    };
+    const direction = getShotDirection(input.angle);
+    const array = attribute.array;
 
-    const initial = getShotDirection(angle);
+    let count = 0;
 
-    let direction = new Vector3(
-      initial.x,
-      0,
-      initial.z
-    ).normalize();
+    let previousGroundY =
+      position.y - BALL_RADIUS;
 
-    let origin = new Vector3(
-      position.x,
-      position.y,
-      position.z
-    );
-
-    const initialSurface = resolveSurface(
-      position,
-      { grounded: true }
-    );
-
-    let remainingDistance = estimateDistance(
-      power,
-      topSpin,
-      initialSurface
-    );
-
-    let bounces = 0;
-    let traveled = 0;
-
-    const output = points.current;
-    output.length = 0;
-
-    while (
-      remainingDistance > MIN_DISTANCE &&
-      output.length < MAX_POINTS
-    ) {
-      const stepDistance = Math.min(
-        STEP,
-        remainingDistance
+    for (let i = 0; i < MAX_POINTS; i++) {
+      const distance = Math.min(
+        i * GUIDE_STEP,
+        GUIDE_LENGTH
       );
 
-      const shapeHit = world.castShape(
-        {
-          x: origin.x,
-          y: origin.y,
-          z: origin.z,
-        },
-        UP,
-        {
-          x: direction.x,
-          y: 0,
-          z: direction.z,
-        },
-        sphere,
-        stepDistance,
+      const x =
+        position.x + direction.x * distance;
+
+      const z =
+        position.z + direction.z * distance;
+
+      // Start just above the previous terrain
+      // height to avoid overhead surfaces.
+      const originY =
+        previousGroundY +
+        MAX_STEP_UP +
+        RAY_MARGIN;
+
+      ray.origin.x = x;
+      ray.origin.y = originY;
+      ray.origin.z = z;
+
+      const rayLength =
+        MAX_STEP_UP +
+        MAX_STEP_DOWN +
+        RAY_MARGIN;
+
+      const hit = world.castRayAndGetNormal(
+        ray,
+        rayLength,
         true,
         undefined,
         undefined,
@@ -258,118 +186,43 @@ export default function AimGuide({
         ball
       );
 
-      const hitDistance = shapeHit
-        ? clamp(
-            shapeHit.timeOfImpact,
-            0,
-            stepDistance
-          )
-        : stepDistance;
+      if (!hit) break;
 
-      const next = origin
-        .clone()
-        .addScaledVector(
-          direction,
-          hitDistance
-        );
+      // Ignore steep vertical surfaces.
+      if (hit.normal.y < 0.55) break;
 
-      if (hitDistance > 0.001) {
-        output.push(next.clone());
+      const groundY =
+        originY - hit.timeOfImpact;
 
-        traveled += hitDistance;
-        remainingDistance -= hitDistance;
+      const difference =
+        groundY - previousGroundY;
+
+      if (
+        difference > MAX_STEP_UP ||
+        difference < -MAX_STEP_DOWN
+      ) {
+        break;
       }
 
-      if (shapeHit) {
-        const normal = getHitNormal(shapeHit);
+      const index = count * 3;
 
-        if (
-          !normal ||
-          bounces >= MAX_BOUNCES ||
-          direction.dot(normal) >= -0.001
-        ) {
-          break;
-        }
+      array[index] = x;
+      array[index + 1] =
+        groundY + GUIDE_HEIGHT;
+      array[index + 2] = z;
 
-        direction = reflect(
-          direction,
-          normal
-        );
-
-        remainingDistance *= BOUNCE_RETENTION;
-
-        // Separate the next cast from the wall.
-        origin = next.addScaledVector(
-          normal,
-          EPSILON
-        );
-
-        bounces++;
-        continue;
-      }
-
-      origin = next;
-
-      // Approximate curve from sidespin.
-      // Direction rotates gradually along the path.
-      const curve =
-        sideSpin *
-        SPIN_CURVE *
-        stepDistance;
-
-      direction.applyAxisAngle(
-        new Vector3(0, 1, 0),
-        curve
-      );
-
-      // Apply additional distance loss for surfaces
-      // encountered along the predicted route.
-      const surface = resolveSurface(
-        origin,
-        { grounded: true }
-      );
-
-      const resistance = getResistance(surface);
-
-      const grassResistance =
-        PHYSICS.surfaces.grass.resistance;
-
-      const extraResistance = Math.max(
-        0,
-        resistance - grassResistance
-      );
-
-      remainingDistance = Math.max(
-        0,
-        remainingDistance -
-          extraResistance * stepDistance * 0.12
-      );
-    }
-
-    const attribute = geometry.getAttribute(
-      "position"
-    );
-
-    const count = Math.min(
-      output.length,
-      MAX_POINTS
-    );
-
-    for (let i = 0; i < count; i++) {
-      const point = output[i];
-
-      attribute.setXYZ(
-        i,
-        point.x,
-        point.y + 0.04,
-        point.z
-      );
+      previousGroundY = groundY;
+      count++;
     }
 
     attribute.needsUpdate = true;
 
     geometry.setDrawRange(0, count);
-    geometry.computeBoundingSphere();
+
+    previousInput.current = input;
+    lastUpdate.current = now;
+
+    renderActivity.wake(100);
   });
 
   return (
@@ -377,13 +230,15 @@ export default function AimGuide({
       ref={guideRef}
       geometry={geometry}
       frustumCulled={false}
+      renderOrder={10}
+      visible={false}
     >
       <pointsMaterial
         color="#a3ff12"
-        size={0.09}
+        size={GUIDE_SIZE}
         sizeAttenuation
         transparent
-        opacity={0.9}
+        opacity={0.95}
         depthWrite={false}
       />
     </points>

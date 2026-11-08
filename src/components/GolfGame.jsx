@@ -16,6 +16,8 @@ import CourseSelectScreen from "../screens/CourseSelectScreen";
 //import SettingsScreen from "../screens/SettingsScreen";
 import { Stats } from "@react-three/drei";
 
+import AdaptiveFrameRate from "./AdaptiveFrameRate";
+
 function SpinControls() {
     const topSpin = useGameStore(
         (s) => s.topSpin
@@ -246,10 +248,11 @@ export default function GolfGame() {
                         far: 100,
                     }}
                 >
+                    <AdaptiveFrameRate fps={45} />  
                     <CourseSession courseIndex={courseIndex} />
-               
-               {import.meta.env.DEV && <Stats />}
-               
+
+                    {import.meta.env.DEV && <Stats />}
+
                 </Canvas>
             )}
 

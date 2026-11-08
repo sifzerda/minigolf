@@ -4,10 +4,13 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 
 import useGameStore from "../store/useGameStore";
+
 import {
   shootBall,
   resetBall,
 } from "../ecs/systems/ShotSystem";
+
+import { renderActivity } from "../utils/renderActivity";
 
 const MAX_CHARGE_TIME = 1.5;
 const ROTATION_SENSITIVITY = 0.005;
@@ -28,11 +31,15 @@ export default function GolfControls({
   const chargeStart = useRef(0);
   const jumpCharge = useRef(false);
 
+  // Update shot power while charging.
   useFrame(() => {
     if (!charging.current) return;
 
+    renderActivity.wake(250);
+
     const elapsed =
-      (performance.now() - chargeStart.current) / 1000;
+      (performance.now() - chargeStart.current) /
+      1000;
 
     const power = clamp(
       elapsed / MAX_CHARGE_TIME,
@@ -64,6 +71,8 @@ export default function GolfControls({
     function startCharge(jump) {
       if (!canShoot() || charging.current) return;
 
+      renderActivity.wake(2000);
+
       charging.current = true;
       jumpCharge.current = jump;
       chargeStart.current = performance.now();
@@ -80,6 +89,8 @@ export default function GolfControls({
 
     function releaseCharge() {
       if (!charging.current) return;
+
+      renderActivity.wake(1000);
 
       charging.current = false;
 
@@ -114,6 +125,7 @@ export default function GolfControls({
       if (event.target !== canvas) return;
 
       if (event.button === 2) {
+        renderActivity.wake(500);
         dragging.current = true;
         return;
       }
@@ -126,17 +138,20 @@ export default function GolfControls({
     function onPointerMove(event) {
       if (!dragging.current) return;
 
+      renderActivity.wake(300);
+
       const state = useGameStore.getState();
 
       state.setAimAngle(
         state.aimAngle -
-        event.movementX * ROTATION_SENSITIVITY
+          event.movementX * ROTATION_SENSITIVITY
       );
     }
 
     function onPointerUp(event) {
       if (event.button === 2) {
         dragging.current = false;
+        renderActivity.wake(300);
       }
 
       if (event.button === 0) {
@@ -149,11 +164,13 @@ export default function GolfControls({
 
       event.preventDefault();
 
+      renderActivity.wake(500);
+
       const state = useGameStore.getState();
 
       state.setCameraDistance(
         state.cameraDistance +
-        event.deltaY * 0.01
+          event.deltaY * 0.01
       );
     }
 
@@ -236,10 +253,14 @@ export default function GolfControls({
 
       if (!action) return;
 
-      if (event.code === "Space" ||
-        event.code === "KeyJ") {
+      if (
+        event.code === "Space" ||
+        event.code === "KeyJ"
+      ) {
         event.preventDefault();
       }
+
+      renderActivity.wake(1000);
 
       action();
     }

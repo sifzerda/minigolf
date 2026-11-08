@@ -16,38 +16,21 @@ import CourseSelectScreen from "../screens/CourseSelectScreen";
 //import SettingsScreen from "../screens/SettingsScreen";
 import { Stats } from "@react-three/drei";
 
-import AdaptiveFrameRate from "./AdaptiveFrameRate";
+import FrameRateLimit from "../renderers/FrameRateLimit";
+import { renderActivity } from "../utils/renderActivity";
 
 function SpinControls() {
-    const topSpin = useGameStore(
-        (s) => s.topSpin
-    );
-
-    const sideSpin = useGameStore(
-        (s) => s.sideSpin
-    );
-
-    const setTopSpin = useGameStore(
-        (s) => s.setTopSpin
-    );
-
-    const setSideSpin = useGameStore(
-        (s) => s.setSideSpin
-    );
-
-    const resetSpin = useGameStore(
-        (s) => s.resetSpin
-    );
+    const topSpin = useGameStore((s) => s.topSpin);
+    const sideSpin = useGameStore((s) => s.sideSpin);
+    const setTopSpin = useGameStore((s) => s.setTopSpin);
+    const setSideSpin = useGameStore((s) => s.setSideSpin);
+    const resetSpin = useGameStore((s) => s.resetSpin);
 
     return (
         <div className="spin-controls">
             <h3>Ball Spin</h3>
 
-            <label>
-                Topspin / Backspin:
-                {" "}
-                {Math.round(topSpin * 100)}%
-            </label>
+            <label> Topspin / Backspin: {" "} {Math.round(topSpin * 100)}%</label>
 
             <input
                 type="range"
@@ -60,28 +43,12 @@ function SpinControls() {
                 }
             />
 
-            <label>
-                Sidespin:
-                {" "}
-                {Math.round(sideSpin * 100)}%
-            </label>
+            <label> Sidespin: {" "} {Math.round(sideSpin * 100)}%</label>
 
-            <input
-                type="range"
-                min="-1"
-                max="1"
-                step="0.1"
-                value={sideSpin}
-                onChange={(event) =>
-                    setSideSpin(Number(event.target.value))
-                }
-            />
+            <input type="range" min="-1" max="1" step="0.1" value={sideSpin}
+                onChange={(event) => setSideSpin(Number(event.target.value))} />
 
-            <button
-                type="button"
-                className="secondary-button"
-                onClick={resetSpin}
-            >
+            <button type="button" className="secondary-button" onClick={resetSpin}>
                 Reset Spin
             </button>
         </div>
@@ -110,31 +77,15 @@ export default function GolfGame() {
     const nextCourse = useGameStore((s) => s.nextCourse);
     const restartCourse = useGameStore((s) => s.restartCourse);
     const resetGame = useGameStore((s) => s.resetGame);
-    const toggleCameraMode = useGameStore(
-        (s) => s.toggleCameraMode
-    );
+    const toggleCameraMode = useGameStore((s) => s.toggleCameraMode);
 
     const course = courses[courseIndex];
-
-    const totalStrokes = results.reduce(
-        (sum, result) => sum + result.strokes,
-        0
-    );
-
-    const totalPar = results.reduce(
-        (sum, result) => sum + result.par,
-        0
-    );
-
+    const totalStrokes = results.reduce((sum, result) => sum + result.strokes, 0);
+    const totalPar = results.reduce((sum, result) => sum + result.par, 0);
     const difference = totalStrokes - totalPar;
+    const degrees = ((Math.round((aimAngle * 180) / Math.PI) % 360) + 360) % 360;
 
-    const degrees =
-        ((Math.round((aimAngle * 180) / Math.PI) % 360) +
-            360) %
-        360;
-
-    const isLastCourse =
-        courseIndex === courses.length - 1;
+    const isLastCourse = courseIndex === courses.length - 1;
 
     useEffect(() => {
         function handleKeyDown(event) {
@@ -216,10 +167,7 @@ export default function GolfGame() {
                 <div className="hud">
                     <h2>Course not found</h2>
 
-                    <button
-                        type="button"
-                        onClick={handleNewGame}
-                    >
+                    <button type="button" onClick={handleNewGame}>
                         Select Course
                     </button>
                 </div>
@@ -232,6 +180,7 @@ export default function GolfGame() {
             {!gameComplete && (
                 <Canvas
                     key={`${courseIndex}-${sessionId}`}
+                    frameloop="always"
                     shadows="soft"
                     dpr={[1, 1.25]}
                     gl={{
@@ -247,8 +196,16 @@ export default function GolfGame() {
                         near: 0.1,
                         far: 100,
                     }}
+
+                    onPointerDown={() => renderActivity.wake(1000)}
+                    onPointerMove={() => renderActivity.wake(250)}
+                    onWheel={() => renderActivity.wake(500)}
                 >
-                    <AdaptiveFrameRate fps={45} />  
+                    <FrameRateLimit
+                        fps={45}
+                        idleFps={10}
+                        course={course}
+                    />
                     <CourseSession courseIndex={courseIndex} />
 
                     {import.meta.env.DEV && <Stats />}
@@ -273,8 +230,6 @@ export default function GolfGame() {
                         <>
                             <p>Aim: {degrees}°</p>
 
-
-
                             <input
                                 type="range"
                                 min="0.1"
@@ -291,11 +246,7 @@ export default function GolfGame() {
 
                             <SpinControls />
 
-                            <button
-                                type="button"
-                                className="secondary-button"
-                                onClick={toggleCameraMode}
-                            >
+                            <button type="button" className="secondary-button" onClick={toggleCameraMode}>
                                 {cameraMode === "follow"
                                     ? "Course Overview"
                                     : "Follow Ball"}
@@ -316,13 +267,9 @@ export default function GolfGame() {
                         <div className="completion">
                             <h3>Course Complete!</h3>
 
-                            <p>
-                                {strokes} strokes — Par {course.par}
-                            </p>
+                            <p>{strokes} strokes — Par {course.par}</p>
 
-                            <button
-                                type="button"
-                                onClick={nextCourse}
+                            <button type="button" onClick={nextCourse}
                             >
                                 {isLastCourse
                                     ? "View Scorecard"
@@ -331,19 +278,16 @@ export default function GolfGame() {
                         </div>
                     )}
 
-                    <button
-                        type="button"
+                    <button type="button"
                         className="secondary-button"
-                        onClick={restartCourse}
-                    >
+                        onClick={restartCourse}>
                         Restart Course
                     </button>
 
                     <button
                         type="button"
                         className="secondary-button"
-                        onClick={handleReturnToSelection}
-                    >
+                        onClick={handleReturnToSelection}>
                         Course Selection
                     </button>
                 </div>

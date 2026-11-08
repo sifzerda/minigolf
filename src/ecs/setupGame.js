@@ -11,35 +11,36 @@ export function clearGame() {
 }
 
 export function setupGame(course) {
-const [startX, startY, startZ] = course.ballStart;
-const ballPosition = course.terrain
-  ? [
-      startX,
-      getTerrainHeight(
-        startX,
-        startZ,
-        course.terrain
-      ) + BALL_RADIUS + 0.05,
-      startZ,
-    ]
-  : [startX, startY, startZ];
-
-
   if (!course) {
     throw new Error("A valid course is required");
   }
 
   clearGame();
 
-  
+  // Calculate starting ball position.
+  const [startX, startY, startZ] = course.ballStart;
 
+  const ballPosition = course.terrain
+    ? [
+        startX,
+        getTerrainHeight(
+          startX,
+          startZ,
+          course.terrain
+        ) + BALL_RADIUS + 0.05,
+        startZ,
+      ]
+    : [startX, startY, startZ];
+
+  // Golf ball.
   world.add({
     id: `${course.id}-ball`,
     ball: true,
     position: ballPosition,
-    radius: 0.25,
+    radius: BALL_RADIUS,
   });
 
+  // Hole.
   world.add({
     id: `${course.id}-hole`,
     hole: true,
@@ -47,29 +48,38 @@ const ballPosition = course.terrain
     radius: course.hole.radius,
   });
 
-  course.surfaces.forEach((surface, index) => {
-    world.add({
-      ...surface,
-      id: `${course.id}-surface-${index}`,
-    });
-  });
+  // Surface entities.
+  (course.surfaces ?? []).forEach(
+    (surface, index) => {
+      world.add({
+        ...surface,
+        id: `${course.id}-surface-${index}`,
+      });
+    }
+  );
 
-  course.ramps.forEach((ramp, index) => {
-    world.add({
-      ...ramp,
-      ramp: true,
-      id: `${course.id}-ramp-${index}`,
-    });
-  });
+  // Ramp entities.
+  (course.ramps ?? []).forEach(
+    (ramp, index) => {
+      world.add({
+        ...ramp,
+        ramp: true,
+        id: `${course.id}-ramp-${index}`,
+      });
+    }
+  );
 
-  course.obstacles.forEach((obstacle, index) => {
-    world.add({
-      ...obstacle,
-      obstacle: true,
-      id: `${course.id}-obstacle-${index}`,
-      respawnPosition:
-        obstacle.respawnPosition ??
-        [...course.ballStart],
-    });
-  });
+  // Obstacle entities.
+  (course.obstacles ?? []).forEach(
+    (obstacle, index) => {
+      world.add({
+        ...obstacle,
+        obstacle: true,
+        id: `${course.id}-obstacle-${index}`,
+        respawnPosition:
+          obstacle.respawnPosition ??
+          [...ballPosition],
+      });
+    }
+  );
 }

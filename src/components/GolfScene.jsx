@@ -21,6 +21,7 @@ import SurfaceRenderer from "../renderers/SurfaceRenderer";
 import ObstacleRenderer from "../renderers/ObstacleRenderer";
 import FollowCamera from "../renderers/FollowCamera";
 import AimGuide from "../renderers/AimGuide";
+
 import GolfControls from "./GolfControls";
 
 import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
@@ -28,6 +29,7 @@ import HoleFlag from "../renderers/HoleFlag";
 import TerrainRenderer from "../renderers/TerrainRenderer";
 
 import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
+import { renderActivity } from "../utils/renderActivity";
 
 const GRAVITY = [0, -9.81, 0];
 
@@ -44,14 +46,29 @@ export default function GolfScene({ course }) {
   const settledRef = useRef(false);
   const activeSurfaceRef = useRef("grass");
 
-  const entities = useMemo(() => ({
-    ball: [...ballQuery][0],
-    hole: [...holeQuery][0],
-    obstacles: [...obstacleQuery],
-    ramps: [...rampQuery],
-    surfaces: [...surfaceQuery],
-  }), [course]);
+  const entities = useMemo(
+    () => ({
+      ball: [...ballQuery][0],
+      hole: [...holeQuery][0],
+      obstacles: [...obstacleQuery],
+      ramps: [...rampQuery],
+      surfaces: [...surfaceQuery],
+    }),
+    [course]
+  );
 
+  // Register the existing Rapier ball with
+  // the adaptive rendering controller.
+  useEffect(() => {
+    renderActivity.registerBall(ballRef);
+    renderActivity.wake(1000);
+
+    return () => {
+      renderActivity.unregisterBall(ballRef);
+    };
+  }, []);
+
+  // Update terrain surface configuration.
   useEffect(() => {
     setActiveTerrain(course?.terrain);
 
@@ -72,12 +89,17 @@ export default function GolfScene({ course }) {
 
       <HoleFlag
         position={course.hole.position}
-        color={FLAG_COLORS[theme] ?? FLAG_COLORS.garden}
+        color={
+          FLAG_COLORS[theme] ??
+          FLAG_COLORS.garden
+        }
       />
 
       <Physics
         gravity={GRAVITY}
         timeStep={1 / 60}
+        updateLoop="independent"
+        interpolation
         colliders={false}
       >
         {course.terrain && (
@@ -100,9 +122,10 @@ export default function GolfScene({ course }) {
           />
         ))}
 
-        {entities.obstacles.map((entity) => (
+        {/* Render each obstacle exactly once. */}
+        {entities.obstacles.map((entity, index) => (
           <ObstacleRenderer
-            key={entity.id}
+            key={entity.id ?? `ecs-${index}`}
             entity={entity}
             ballRef={ballRef}
           />

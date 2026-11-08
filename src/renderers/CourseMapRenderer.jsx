@@ -6,10 +6,29 @@ const WIDTH = 320;
 const HEIGHT = 440;
 const PADDING = 30;
 
+const SURFACE_COLORS = {
+  sand: "#d8c18b",
+  ice: "#8cdef0",
+  concrete: "#999999",
+};
+
+const isPoint2 = (point) =>
+  Array.isArray(point) &&
+  point.length >= 2 &&
+  Number.isFinite(point[0]) &&
+  Number.isFinite(point[1]);
+
+const isPoint3 = (point) =>
+  Array.isArray(point) &&
+  point.length >= 3 &&
+  Number.isFinite(point[0]) &&
+  Number.isFinite(point[2]);
+
 function getBounds(course) {
-  const points = course.sections
+  const points = (course.sections ?? [])
     .filter((section) => section.type === "floor")
-    .flatMap((section) => section.points ?? []);
+    .flatMap((section) => section.points ?? [])
+    .filter(isPoint2);
 
   if (!points.length) {
     return {
@@ -20,8 +39,8 @@ function getBounds(course) {
     };
   }
 
-  const xs = points.map((p) => p[0]);
-  const zs = points.map((p) => p[1]);
+  const xs = points.map((point) => point[0]);
+  const zs = points.map((point) => point[1]);
 
   return {
     minX: Math.min(...xs),
@@ -32,17 +51,106 @@ function getBounds(course) {
 }
 
 function MapObstacle({ obstacle, project, scale }) {
-  const [x, , z] = obstacle.position;
-  const [cx, cy] = project(x, z);
+  const {
+    type,
+    position,
+    start,
+    end,
+    size,
+    radius,
+    distance = 0,
+    axis = "x",
+    color = "#ffcc33",
+  } = obstacle;
 
-  const color = obstacle.color ?? "#ffcc33";
+  // Terrain-style line obstacles use 2D endpoints.
+  if (type === "cliff" || type === "ledge") {
+    if (!isPoint2(start) || !isPoint2(end)) {
+      return null;
+    }
 
-  if (obstacle.type === "bumper") {
+    const [x1, y1] = project(start[0], start[1]);
+    const [x2, y2] = project(end[0], end[1]);
+
+    if (type === "cliff") {
+      return (
+        <line
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={color}
+          strokeWidth="5"
+          strokeDasharray="8 4"
+          strokeLinecap="round"
+        />
+      );
+    }
+
+    return (
+      <line
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={color}
+        strokeWidth={Math.max(
+          2,
+          (obstacle.width ?? 2) * scale
+        )}
+        strokeLinecap="round"
+        opacity="0.75"
+      />
+    );
+  }
+
+  // Plateau uses a 2D [x, z] position.
+  if (type === "plateau") {
+    if (!isPoint2(position)) return null;
+
+    const [cx, cy] = project(position[0], position[1]);
+
+    return (
+      <g>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={(radius ?? 2) * scale}
+          fill={color === "#ffcc33" ? "#725a45" : color}
+          stroke="#ffffff"
+          strokeWidth="2"
+          opacity="0.8"
+        />
+
+        <circle
+          cx={cx}
+          cy={cy}
+          r={Math.max(
+            1,
+            ((radius ?? 2) -
+              (obstacle.edgeWidth ?? 0.5)) * scale
+          )}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeDasharray="4 4"
+          opacity="0.5"
+        />
+      </g>
+    );
+  }
+
+  // Standard obstacles use [x, y, z].
+  if (!isPoint3(position)) return null;
+
+  const [cx, cy] = project(position[0], position[2]);
+
+  if (type === "bumper") {
     return (
       <circle
         cx={cx}
         cy={cy}
-        r={(obstacle.radius ?? 0.4) * scale}
+        r={(radius ?? 0.4) * scale}
         fill={color}
         stroke="#ffffff"
         strokeWidth="1.5"
@@ -51,38 +159,35 @@ function MapObstacle({ obstacle, project, scale }) {
   }
 
   if (
-    obstacle.type === "block" ||
-    obstacle.type === "movingBarrier"
+    type === "block" ||
+    type === "movingBarrier" ||
+    type === "movingPlatform"
   ) {
-    const [width, , depth] = obstacle.size;
+    if (
+      !Array.isArray(size) ||
+      !Number.isFinite(size[0]) ||
+      !Number.isFinite(size[2])
+    ) {
+      return null;
+    }
 
-    const distance =
-      obstacle.type === "movingBarrier"
-        ? obstacle.distance ?? 0
-        : 0;
+    const width = size[0] * scale;
+    const depth = size[2] * scale;
 
-    const isMoving = obstacle.type === "movingBarrier";
+    const isMoving =
+      type === "movingBarrier" ||
+      type === "movingPlatform";
+
+    const travel = Math.max(0, distance) * scale;
 
     return (
       <g>
-        {isMoving && (
+        {isMoving && travel > 0 && (
           <line
-            x1={
-              cx -
-              (obstacle.axis === "z" ? 0 : distance * scale)
-            }
-            y1={
-              cy -
-              (obstacle.axis === "z" ? distance * scale : 0)
-            }
-            x2={
-              cx +
-              (obstacle.axis === "z" ? 0 : distance * scale)
-            }
-            y2={
-              cy +
-              (obstacle.axis === "z" ? distance * scale : 0)
-            }
+            x1={cx - (axis === "x" ? travel : 0)}
+            y1={cy - (axis === "z" ? travel : 0)}
+            x2={cx + (axis === "x" ? travel : 0)}
+            y2={cy + (axis === "z" ? travel : 0)}
             stroke={color}
             strokeWidth="2"
             strokeDasharray="5 5"
@@ -91,20 +196,30 @@ function MapObstacle({ obstacle, project, scale }) {
         )}
 
         <rect
-          x={cx - (width * scale) / 2}
-          y={cy - (depth * scale) / 2}
-          width={width * scale}
-          height={depth * scale}
+          x={cx - width / 2}
+          y={cy - depth / 2}
+          width={width}
+          height={depth}
           rx="2"
           fill={color}
           stroke="#ffffff"
           strokeWidth="1.5"
         />
+
+        {isMoving && axis === "y" && (
+          <circle
+            cx={cx}
+            cy={cy}
+            r="4"
+            fill="#ffffff"
+            opacity="0.85"
+          />
+        )}
       </g>
     );
   }
 
-  if (obstacle.type === "windmill") {
+  if (type === "turnstile") {
     const length = (obstacle.bladeLength ?? 5) * scale;
     const thickness = (obstacle.bladeWidth ?? 0.35) * scale;
 
@@ -146,16 +261,24 @@ function MapObstacle({ obstacle, project, scale }) {
 }
 
 function MapSurface({ surface, project, scale }) {
-  const [x, , z] = surface.position;
-  const [cx, cy] = project(x, z);
+  if (
+    !isPoint3(surface.position) ||
+    !Array.isArray(surface.size)
+  ) {
+    return null;
+  }
 
+  const [x, , z] = surface.position;
   const [width, depth] = surface.size;
 
-  const colors = {
-    sand: "#d8c18b",
-    ice: "#8cdef0",
-    concrete: "#999999",
-  };
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(depth)
+  ) {
+    return null;
+  }
+
+  const [cx, cy] = project(x, z);
 
   return (
     <rect
@@ -163,7 +286,9 @@ function MapSurface({ surface, project, scale }) {
       y={cy - (depth * scale) / 2}
       width={width * scale}
       height={depth * scale}
-      fill={colors[surface.type] ?? "#d8c18b"}
+      fill={
+        SURFACE_COLORS[surface.type] ?? "#d8c18b"
+      }
       opacity="0.85"
       rx="2"
     />
@@ -171,10 +296,24 @@ function MapSurface({ surface, project, scale }) {
 }
 
 function MapRamp({ ramp, project, scale }) {
-  const [x, , z] = ramp.position;
-  const [cx, cy] = project(x, z);
+  if (
+    !isPoint3(ramp.position) ||
+    !Array.isArray(ramp.size)
+  ) {
+    return null;
+  }
 
+  const [x, , z] = ramp.position;
   const [width, , length] = ramp.size;
+
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(length)
+  ) {
+    return null;
+  }
+
+  const [cx, cy] = project(x, z);
 
   return (
     <g>
@@ -225,14 +364,22 @@ export default function CourseMapRenderer({ course }) {
     ];
   }
 
+  const ballPosition = isPoint3(course.ballStart)
+    ? course.ballStart
+    : [0, 0, 0];
+
+  const holePosition = isPoint3(course.hole?.position)
+    ? course.hole.position
+    : [0, 0, 0];
+
   const [ballX, ballY] = project(
-    course.ballStart[0],
-    course.ballStart[2]
+    ballPosition[0],
+    ballPosition[2]
   );
 
   const [holeX, holeY] = project(
-    course.hole.position[0],
-    course.hole.position[2]
+    holePosition[0],
+    holePosition[2]
   );
 
   return (
@@ -249,52 +396,74 @@ export default function CourseMapRenderer({ course }) {
         rx="14"
       />
 
-      {course.sections
-        .filter((section) => section.type === "floor")
-        .map((section) => (
-          <polygon
-            key={section.id}
-            points={section.points
-              .map(([x, z]) => project(x, z).join(","))
-              .join(" ")}
-            fill={section.color ?? "#25834a"}
-            stroke="#a67b52"
-            strokeWidth="4"
-            strokeLinejoin="round"
+      {(course.sections ?? [])
+        .filter(
+          (section) =>
+            section.type === "floor" &&
+            Array.isArray(section.points)
+        )
+        .map((section, index) => {
+          const points = section.points
+            .filter(isPoint2)
+            .map(([x, z]) =>
+              project(x, z).join(",")
+            )
+            .join(" ");
+
+          if (!points) return null;
+
+          return (
+            <polygon
+              key={section.id ?? index}
+              points={points}
+              fill={section.color ?? "#25834a"}
+              stroke="#a67b52"
+              strokeWidth="4"
+              strokeLinejoin="round"
+            />
+          );
+        })}
+
+      {(course.surfaces ?? []).map(
+        (surface, index) => (
+          <MapSurface
+            key={surface.id ?? index}
+            surface={surface}
+            project={project}
+            scale={scale}
           />
-        ))}
+        )
+      )}
 
-      {(course.surfaces ?? []).map((surface, index) => (
-        <MapSurface
-          key={surface.id ?? index}
-          surface={surface}
-          project={project}
-          scale={scale}
-        />
-      ))}
+      {(course.ramps ?? []).map(
+        (ramp, index) => (
+          <MapRamp
+            key={ramp.id ?? index}
+            ramp={ramp}
+            project={project}
+            scale={scale}
+          />
+        )
+      )}
 
-      {(course.ramps ?? []).map((ramp, index) => (
-        <MapRamp
-          key={ramp.id ?? index}
-          ramp={ramp}
-          project={project}
-          scale={scale}
-        />
-      ))}
-
-      {(course.obstacles ?? []).map((obstacle, index) => (
-        <MapObstacle
-          key={obstacle.id ?? index}
-          obstacle={obstacle}
-          project={project}
-          scale={scale}
-        />
-      ))}
+      {(course.obstacles ?? []).map(
+        (obstacle, index) => (
+          <MapObstacle
+            key={obstacle.id ?? index}
+            obstacle={obstacle}
+            project={project}
+            scale={scale}
+          />
+        )
+      )}
 
       <circle
         cx={holeX}
         cy={holeY}
-        r={Math.max(4, course.hole.radius * scale)}
+        r={Math.max(
+          4,
+          (course.hole?.radius ?? 0.4) * scale
+        )}
         fill="#111111"
         stroke="#eeeeee"
         strokeWidth="2"

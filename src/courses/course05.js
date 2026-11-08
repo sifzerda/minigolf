@@ -15,7 +15,7 @@ const points = [
 const course05 = {
   id: "course-05",
   number: 5,
-  name: "Windmill",
+  name: "Turnstile",
   environment: "neon",
   par: 4,
 
@@ -43,7 +43,7 @@ const course05 = {
 
   obstacles: [
     {
-      type: "windmill",
+      type: "turnstile",
       position: [0, 0.4, 0],
       bladeLength: 5,
       bladeWidth: 0.35,

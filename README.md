@@ -95,5 +95,4 @@ This project is incomplete and requires further development. Currently the highs
 
 - [ ] 
 - [ ]
-- [ ]
-- [ ] 
+- [ ]courses, and add selection of 9, 18, 27, or 36 courses

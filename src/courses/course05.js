@@ -150,6 +150,21 @@ const course05 = {
       color: "#6b7c86",
     },
 
+    {
+      type: "splineRidge",
+
+      points: [
+        [-10, 8],
+        [-5, 5],
+        [0, 7],
+        [5, 2],
+        [10, -4],
+      ],
+
+      width: 4,
+      height: 3.5,
+    }
+
   ],
 };
 

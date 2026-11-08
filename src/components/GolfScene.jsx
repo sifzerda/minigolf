@@ -1,6 +1,6 @@
 // src/components/GolfScene.jsx
 
-import { useRef } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { Physics } from "@react-three/rapier";
 
 import {
@@ -13,7 +13,6 @@ import {
 
 import GolfBall from "../physics/GolfBall";
 import HoleSensor from "../physics/HoleSensor";
-
 import BallPhysicsSystem from "../ecs/systems/BallPhysicsSystem";
 
 import CourseGeometryRenderer from "../renderers/CourseGeometryRenderer";
@@ -22,13 +21,15 @@ import SurfaceRenderer from "../renderers/SurfaceRenderer";
 import ObstacleRenderer from "../renderers/ObstacleRenderer";
 import FollowCamera from "../renderers/FollowCamera";
 import AimGuide from "../renderers/AimGuide";
-
 import GolfControls from "./GolfControls";
 
 import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
 import HoleFlag from "../renderers/HoleFlag";
-
 import TerrainRenderer from "../renderers/TerrainRenderer";
+
+import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
+
+const GRAVITY = [0, -9.81, 0];
 
 const FLAG_COLORS = {
   garden: "#ff4545",
@@ -43,54 +44,63 @@ export default function GolfScene({ course }) {
   const settledRef = useRef(false);
   const activeSurfaceRef = useRef("grass");
 
-  const ball = [...ballQuery][0];
-  const hole = [...holeQuery][0];
+  const entities = useMemo(() => ({
+    ball: [...ballQuery][0],
+    hole: [...holeQuery][0],
+    obstacles: [...obstacleQuery],
+    ramps: [...rampQuery],
+    surfaces: [...surfaceQuery],
+  }), [course]);
 
-  if (!course || !ball || !hole) return null;
+  useEffect(() => {
+    setActiveTerrain(course?.terrain);
+
+    return () => {
+      setActiveTerrain(null);
+    };
+  }, [course?.terrain]);
+
+  if (!course || !entities.ball || !entities.hole) {
+    return null;
+  }
 
   const theme = course.environment ?? "garden";
 
   return (
     <>
-      {/* Environment includes lighting */}
       <EnvironmentRenderer theme={theme} />
 
-      {/* Decorative hole flag */}
       <HoleFlag
         position={course.hole.position}
         color={FLAG_COLORS[theme] ?? FLAG_COLORS.garden}
       />
 
       <Physics
-        gravity={[0, -9.81, 0]}
+        gravity={GRAVITY}
         timeStep={1 / 60}
+        colliders={false}
       >
-        {/* Procedural terrain */}
         {course.terrain && (
           <TerrainRenderer terrain={course.terrain} />
         )}
 
-        {/* Existing course geometry */}
         <CourseGeometryRenderer course={course} />
 
-        {/* Surface regions */}
-        {[...surfaceQuery].map((entity) => (
+        {entities.surfaces.map((entity) => (
           <SurfaceRenderer
             key={entity.id}
             entity={entity}
           />
         ))}
 
-        {/* Ramps */}
-        {[...rampQuery].map((entity) => (
+        {entities.ramps.map((entity) => (
           <RampRenderer
             key={entity.id}
             entity={entity}
           />
         ))}
 
-        {/* Obstacles */}
-        {[...obstacleQuery].map((entity) => (
+        {entities.obstacles.map((entity) => (
           <ObstacleRenderer
             key={entity.id}
             entity={entity}
@@ -98,43 +108,37 @@ export default function GolfScene({ course }) {
           />
         ))}
 
-        {/* Golf ball */}
         <GolfBall
-          entity={ball}
+          entity={entities.ball}
           ballRef={ballRef}
         />
 
-        {/* Ball physics */}
         <BallPhysicsSystem
           ballRef={ballRef}
           settledRef={settledRef}
           activeSurfaceRef={activeSurfaceRef}
         />
 
-        {/* Hole detection */}
         <HoleSensor
-          hole={hole}
+          hole={entities.hole}
           ballRef={ballRef}
         />
 
-        {/* Shot trajectory */}
         <AimGuide
           ballRef={ballRef}
           settledRef={settledRef}
         />
       </Physics>
 
-      {/* Camera */}
       <FollowCamera
         ballRef={ballRef}
         course={course}
       />
 
-      {/* Player controls */}
       <GolfControls
         ballRef={ballRef}
         settledRef={settledRef}
-        startPosition={ball.position}
+        startPosition={entities.ball.position}
       />
     </>
   );

@@ -45,5 +45,17 @@ export const PHYSICS = {
       friction: 0.65,
       rollingGrip: 0.75,
     },
+
+    rock: {
+      resistance: 0.35,
+      friction: 0.7,
+      rollingGrip: 0.75,
+    },
+
+    snow: {
+      resistance: 2.2,
+      friction: 1.0,
+      rollingGrip: 0.9,
+    },
   },
 };

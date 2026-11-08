@@ -9,7 +9,10 @@ import {
 import { buildTerrain } from "../terrain/TerrainBuilder.js";
 
 export default function TerrainRenderer({ terrain }) {
-  const meshData = useMemo(() => buildTerrain(terrain), [terrain]);
+  const meshData = useMemo(
+    () => buildTerrain(terrain),
+    [terrain]
+  );
 
   useEffect(() => {
     return () => {
@@ -37,8 +40,8 @@ export default function TerrainRenderer({ terrain }) {
         receiveShadow
       >
         <meshStandardMaterial
-          color={terrain.color ?? "#548a43"}
-          roughness={0.95}
+          vertexColors
+          roughness={0.9}
           metalness={0}
         />
       </mesh>

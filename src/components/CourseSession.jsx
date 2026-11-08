@@ -1,7 +1,6 @@
 // src/components/CourseSession.jsx
 
 import { useEffect, useState } from "react";
-
 import { setupGame, clearGame } from "../ecs/setupGame";
 import { getCourse } from "../courses";
 

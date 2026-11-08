@@ -1,29 +1,20 @@
 // src/renderers/EnvironmentRenderer.jsx
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
+import * as THREE from "three";
+
 import { getEnvironment } from "../ecs/constants/environments";
+
 import LightingRenderer from "./LightingRenderer";
-import AnimatedDecoration from "./AnimatedDecoration";
+import Decorations from "./Decorations";
 
-export default function EnvironmentRenderer({
-  theme = "garden",
-}) {
-  const environment = getEnvironment(theme);
+// Shared geometry: created only once.
+const GROUND_GEOMETRY = new THREE.PlaneGeometry(150, 150);
 
-  const decorations = useMemo(() => {
-    const count = 20;
-
-    return Array.from({ length: count }, (_, index) => {
-      const angle = (index / count) * Math.PI * 2;
-      const radius = 18 + (index % 3) * 3;
-
-      return [
-        Math.cos(angle) * radius,
-        0,
-        Math.sin(angle) * radius,
-      ];
-    });
-  }, []);
+function EnvironmentRenderer({ theme = "garden" }) {
+  const environment = useMemo(() => getEnvironment(theme),
+    [theme]
+  );
 
   return (
     <>
@@ -43,17 +34,16 @@ export default function EnvironmentRenderer({
         ]}
       />
 
-      {/* Environment-specific lighting */}
+      {/* Environment lighting */}
       <LightingRenderer theme={theme} />
 
-      {/* Surrounding ground */}
+      {/* Shared surrounding ground */}
       <mesh
+        geometry={GROUND_GEOMETRY}
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.6, 0]}
         receiveShadow
       >
-        <planeGeometry args={[150, 150]} />
-
         <meshStandardMaterial
           color={environment.ground}
           roughness={1}
@@ -61,15 +51,12 @@ export default function EnvironmentRenderer({
         />
       </mesh>
 
-      {/* Animated environment decorations */}
-      {decorations.map((position, index) => (
-        <AnimatedDecoration
-          key={index}
-          index={index}
-          type={environment.decorations}
-          position={position}
-        />
-      ))}
+      {/* Batched environmental decorations */}
+      <Decorations
+        type={environment.decorations}
+      />
     </>
   );
 }
+
+export default memo(EnvironmentRenderer);

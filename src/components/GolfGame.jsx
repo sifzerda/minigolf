@@ -231,9 +231,13 @@ export default function GolfGame() {
                 <Canvas
                     key={`${courseIndex}-${sessionId}`}
                     shadows="soft"
+                    dpr={[1, 1.25]}
                     gl={{
-                        antialias: true,
+                        antialias: false,
                         powerPreference: "high-performance",
+                        alpha: false,
+                        stencil: false,
+                        depth: true,
                     }}
                     camera={{
                         position: [0, 5, 15],

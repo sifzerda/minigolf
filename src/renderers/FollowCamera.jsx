@@ -6,6 +6,9 @@ import { Vector3, MathUtils } from "three";
 
 import useGameStore from "../store/useGameStore";
 
+const POSITION_EPSILON = 0.0001;
+const TARGET_EPSILON = 0.0001;
+
 function getCourseBounds(course) {
   const points = (course?.sections ?? [])
     .filter((section) => section.type === "floor")
@@ -20,13 +23,17 @@ function getCourseBounds(course) {
     };
   }
 
-  const xs = points.map((p) => p[0]);
-  const zs = points.map((p) => p[1]);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
 
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minZ = Math.min(...zs);
-  const maxZ = Math.max(...zs);
+  for (const [x, z] of points) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
+  }
 
   return {
     centerX: (minX + maxX) / 2,
@@ -56,20 +63,19 @@ export default function FollowCamera({ ballRef, course }) {
     const ball = ballRef.current;
     if (!ball) return;
 
-    const position = ball.translation();
-
     const desiredPosition = desiredPositionRef.current;
     const desiredTarget = desiredTargetRef.current;
 
     if (cameraMode === "overview") {
-      const aspect = size.width / Math.max(1, size.height);
+      const aspect =
+        size.width / Math.max(1, size.height);
 
       const verticalSpan = Math.max(
         bounds.length,
         bounds.width / aspect
       );
 
-      const fov = (camera.fov * Math.PI) / 180;
+      const fov = MathUtils.degToRad(camera.fov);
 
       const height =
         (verticalSpan * 1.2) /
@@ -87,6 +93,8 @@ export default function FollowCamera({ ballRef, course }) {
         bounds.centerZ
       );
     } else {
+      const position = ball.translation();
+
       const baseDistance = Math.max(
         bounds.width,
         bounds.length * 0.6,
@@ -109,7 +117,20 @@ export default function FollowCamera({ ballRef, course }) {
       );
     }
 
-    const smoothing = 1 - Math.exp(-4 * delta);
+    const positionChanged =
+      camera.position.distanceToSquared(desiredPosition) >
+      POSITION_EPSILON;
+
+    const targetChanged =
+      targetRef.current.distanceToSquared(desiredTarget) >
+      TARGET_EPSILON;
+
+    if (!positionChanged && !targetChanged) {
+      return;
+    }
+
+    const smoothing =
+      1 - Math.exp(-4 * Math.min(delta, 0.1));
 
     camera.position.lerp(
       desiredPosition,

@@ -1,6 +1,7 @@
 // src/ecs/systems/GroundDetection.js
 
 import { Ray } from "@dimforge/rapier3d-compat";
+
 import {
   BALL_RADIUS,
   PHYSICS,
@@ -8,25 +9,25 @@ import {
 
 const DOWN = { x: 0, y: -1, z: 0 };
 
+const groundRay = new Ray(
+  { x: 0, y: 0, z: 0 },
+  DOWN
+);
+
 export function detectGround(world, ball) {
   if (!world || !ball) return null;
 
   const position = ball.translation();
 
-  const ray = new Ray(
-    {
-      x: position.x,
-      y: position.y,
-      z: position.z,
-    },
-    DOWN
-  );
+  groundRay.origin.x = position.x;
+  groundRay.origin.y = position.y;
+  groundRay.origin.z = position.z;
 
   const maxDistance =
     BALL_RADIUS + PHYSICS.groundProbeDistance;
 
   const hit = world.castRayAndGetNormal(
-    ray,
+    groundRay,
     maxDistance,
     true,
     undefined,
@@ -37,19 +38,13 @@ export function detectGround(world, ball) {
 
   if (!hit) return null;
 
-  const normal = hit.normal;
-
-  if (normal.y < PHYSICS.groundNormalMinY) {
+  if (hit.normal.y < PHYSICS.groundNormalMinY) {
     return null;
   }
 
   return {
     grounded: true,
-    normal: {
-      x: normal.x,
-      y: normal.y,
-      z: normal.z,
-    },
+    normal: hit.normal,
     collider: hit.collider,
     distance: hit.timeOfImpact,
   };

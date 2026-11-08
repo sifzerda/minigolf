@@ -73,7 +73,33 @@ const course04 = {
       distance: 0.7,
       speed: 0.5,
       color: "#48c9ff",
-    }
+    },
+
+    {
+      type: "plateau",
+      position: [5, -4],
+      radius: 4,
+      height: 2.5,
+      edgeWidth: 1.5,
+    },
+
+    {
+      type: "cliff",
+      start: [-8, -6],
+      end: [8, -6],
+      height: 3.5,
+      sharpness: 0.6,
+    },
+
+    {
+      type: "ledge",
+      start: [-6, 5],
+      end: [6, -5],
+      width: 2.5,
+      height: 2,
+      edgeWidth: 0.7,
+    },
+
   ],
 };
 

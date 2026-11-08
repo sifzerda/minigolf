@@ -9,11 +9,13 @@ import MenuScreen from "../screens/MenuScreen";
 import CoursePreviewScreen from "../screens/CoursePreviewScreen";
 import CourseSession from "./CourseSession";
 import CourseSelectScreen from "../screens/CourseSelectScreen";
+
 //import GameCompleteScreen from "../screens/GameCompleteScreen";
 //import PauseScreen from "../screens/PauseScreen";
 //import ScorecardScreen from "../screens/ScorecardScreen";
 //import HowToPlayScreen from "../screens/HowToPlayScreen";
-//import SettingsScreen from "../screens/SettingsScreen";
+
+import SettingsScreen from "../screens/SettingsScreen";
 import { Stats } from "@react-three/drei";
 
 import FrameRateLimit from "../renderers/FrameRateLimit";
@@ -54,7 +56,6 @@ function SpinControls() {
         </div>
     );
 }
-
 
 export default function GolfGame() {
     const [screen, setScreen] = useState("menu");
@@ -130,9 +131,14 @@ export default function GolfGame() {
                 <MenuScreen
                     onPlay={() => setScreen("select")}
                     onSelectCourses={() => setScreen("select")}
+                    onSettings={() => setScreen("settings")}
                 />
             </div>
         );
+    }
+
+    if (screen === "settings") {
+        return <div className="game"><SettingsScreen onBack={() => setScreen("menu")} /></div>;
     }
 
     if (screen === "select") {

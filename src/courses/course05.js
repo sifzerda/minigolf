@@ -52,20 +52,6 @@ const course05 = {
     },
 
     {
-      type: "block",
-      position: [-2.5, 0.4, -4],
-      size: [1, 0.8, 1],
-      color: "#888888",
-    },
-
-    {
-      type: "block",
-      position: [2.5, 0.4, -4],
-      size: [1, 0.8, 1],
-      color: "#888888",
-    },
-
-    {
       id: "platform-1",
       type: "movingPlatform",
       position: [0, 0.5, 0],
@@ -103,51 +89,6 @@ const course05 = {
       thickness: 0.12,
       segments: 20,
       color: "#647d88",
-    },
-
-    {
-      type: "pipe",
-      position: [4, 1.5, -4],
-      radius: 0.8,
-      length: 5,
-      rotation: [-0.15, 0, 0],
-      color: "#647d88",
-    },
-
-    {
-      type: "bridge",
-      position: [0, 1.5, -5],
-      size: [2.5, 0.25, 6],
-      rails: true,
-      railHeight: 0.5,
-      railThickness: 0.12,
-      friction: 0.8,
-      color: "#80664c",
-      railColor: "#4a3829",
-    },
-
-    {
-      type: "bridge",
-      position: [0, 1.5, -5],
-      size: [2.5, 0.25, 6],
-      rails: true,
-      railHeight: 0.5,
-      railThickness: 0.12,
-      friction: 0.8,
-      color: "#80664c",
-      railColor: "#4a3829",
-      rotation: [-0.15, 0, 0],
-    },
-
-    {
-      type: "elevatedPath",
-      position: [4, 2, -6],
-      size: [2, 0.2, 8],
-      supportHeight: 1.5,
-      supportWidth: 0.3,
-      supports: true,
-      friction: 0.8,
-      color: "#6b7c86",
     },
 
     {

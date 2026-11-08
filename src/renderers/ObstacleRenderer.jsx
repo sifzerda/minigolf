@@ -1,10 +1,12 @@
 // src/renderers/ObstacleRenderer.jsx
 
-import { useRef } from "react";
+import { useMemo, useEffect, useRef } from "react";
+import { BufferGeometry, Float32BufferAttribute, DoubleSide } from "three";
 import {
   RigidBody,
   BallCollider,
   CuboidCollider,
+  TrimeshCollider,
   useBeforePhysicsStep,
   useRapier,
 } from "@react-three/rapier";
@@ -12,6 +14,7 @@ import { useState } from "react";
 import useGameStore from "../store/useGameStore";
 import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
+import { VerticalLoop, HorizontalLoop, InclinedLoop } from "./LoopObstacle";
 
 const halfSize = (size) =>
   size.map((value) => value / 2);
@@ -380,70 +383,97 @@ function ConveyorBelt({ entity, ballRef }) {
 }
 
 
-function Tunnel({ entity }) {
-  const size = entity.size ?? [2, 1.5, 5];
-  const [width, height, length] = size;
-
-  const thickness = Math.min(
-    entity.thickness ?? 0.15,
-    width / 4,
-    height / 4
+// Reusable static collider and matching visible geometry.
+function StaticPart({ part, friction = 0.8, restitution = 0.1 }) {
+  return (
+    <group
+      position={part.position ?? [0, 0, 0]}
+      rotation={part.rotation ?? [0, 0, 0]}
+    >
+      <CuboidCollider
+        args={halfSize(part.size)}
+        friction={friction}
+        restitution={restitution}
+      />
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={part.size} />
+        <meshStandardMaterial
+          color={part.color}
+          roughness={part.roughness ?? 0.8}
+          metalness={part.metalness ?? 0.05}
+        />
+      </mesh>
+    </group>
   );
+}
 
+// A deck's center is at local y=0. Its top is at thickness/2.
+// Optional approach ramps meet that top and descend toward groundY.
+function makeAccessRamps({
+  width, thickness, length, centerY, groundY, rampLength,
+  rampThickness, color,
+}) {
+  if (rampLength <= 0) return [];
+  const topY = centerY + thickness / 2;
+  const rise = topY - groundY;
+  if (rise <= 0.001) return [];
+  const angle = Math.atan2(rise, rampLength);
+  const slopedLength = Math.hypot(rampLength, rise);
+  const centerLocalY = (groundY + topY) / 2 - centerY -
+    (rampThickness / 2) * Math.cos(angle);
+  const centerZ = (length + rampLength) / 2;
+  return [-1, 1].map((side) => ({
+    id: `approach-${side}`,
+    position: [0, centerLocalY, side * centerZ],
+    rotation: [side * angle, 0, 0],
+    size: [width, rampThickness, slopedLength],
+    color,
+  }));
+}
+
+function Tunnel({ entity }) {
+  const [width, height, length] = entity.size ?? [2, 1.5, 5];
+  const thickness = Math.max(
+    0.04,
+    Math.min(entity.thickness ?? 0.15, width / 4, height / 4)
+  );
   const color = entity.color ?? "#586b76";
-
+  // Most courses already have a playable floor beneath the tunnel.
+  // Use floor:true only for tunnels spanning a gap.
+  const hasFloor = entity.floor === true;
   const parts = [
     {
-      position: [0, -height / 2 + thickness / 2, 0],
-      size: [width, thickness, length],
+      id: "roof", position: [0, height / 2 - thickness / 2, 0],
+      size: [width, thickness, length], color,
     },
     {
-      position: [0, height / 2 - thickness / 2, 0],
-      size: [width, thickness, length],
+      id: "left", position: [-width / 2 + thickness / 2, 0, 0],
+      size: [thickness, height, length], color,
     },
     {
-      position: [-width / 2 + thickness / 2, 0, 0],
-      size: [thickness, height, length],
-    },
-    {
-      position: [width / 2 - thickness / 2, 0, 0],
-      size: [thickness, height, length],
+      id: "right", position: [width / 2 - thickness / 2, 0, 0],
+      size: [thickness, height, length], color,
     },
   ];
-
+  if (hasFloor) {
+    parts.push({
+      id: "floor", position: [0, -height / 2 + thickness / 2, 0],
+      size: [width, thickness, length], color: entity.floorColor ?? color,
+    });
+  }
   return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
+    <RigidBody type="fixed" colliders={false}
       position={entity.position}
       rotation={entity.rotation ?? [0, 0, 0]}
     >
-      {parts.map((part, index) => (
-        <group
-          key={index}
-          position={part.position}
-        >
-          <CuboidCollider
-            args={part.size.map((value) => value / 2)}
-            friction={0.7}
-            restitution={0.1}
-          />
-
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={part.size} />
-            <meshStandardMaterial
-              color={color}
-              metalness={0.2}
-              roughness={0.7}
-              side={2}
-            />
-          </mesh>
-        </group>
+      {parts.map((part) => (
+        <StaticPart key={part.id} part={part}
+          friction={entity.friction ?? 0.7}
+          restitution={entity.restitution ?? 0.1} />
       ))}
     </RigidBody>
   );
 }
-
 
 function Pipe({ entity }) {
   const radius = entity.radius ?? 0.8;
@@ -519,184 +549,108 @@ function Pipe({ entity }) {
 
 
 function Bridge({ entity }) {
-  const size = entity.size ?? [3, 0.25, 6];
-
-  const [width, thickness, length] = size;
-
+  const [width, thickness, length] = entity.size ?? [3, 0.25, 6];
   const railHeight = entity.railHeight ?? 0.5;
-  const railThickness = entity.railThickness ?? 0.12;
-
-  const hasRails = entity.rails !== false;
-
+  const railThickness = Math.min(entity.railThickness ?? 0.12, width / 4);
   const color = entity.color ?? "#80664c";
   const railColor = entity.railColor ?? "#4a3829";
-
-  const parts = [
-    {
-      id: "deck",
-      position: [0, 0, 0],
-      size: [width, thickness, length],
-      color,
-    },
-  ];
-
-  if (hasRails) {
-    const railY =
-      thickness / 2 + railHeight / 2;
-
-    const railX =
-      width / 2 - railThickness / 2;
-
-    parts.push(
-      {
-        id: "left-rail",
-        position: [-railX, railY, 0],
-        size: [
-          railThickness,
-          railHeight,
-          length,
-        ],
-        color: railColor,
-      },
-      {
-        id: "right-rail",
-        position: [railX, railY, 0],
-        size: [
-          railThickness,
-          railHeight,
-          length,
-        ],
-        color: railColor,
-      }
-    );
+  const parts = [{
+    id: "deck", position: [0, 0, 0], size: [width, thickness, length], color,
+  }];
+  if (entity.rails !== false) {
+    const railY = thickness / 2 + railHeight / 2;
+    const railX = width / 2 - railThickness / 2;
+    for (const side of [-1, 1]) {
+      parts.push({
+        id: `rail-${side}`, position: [side * railX, railY, 0],
+        size: [railThickness, railHeight, length], color: railColor,
+      });
+    }
   }
-
+  // ramps:true creates two access ramps. Existing bridges are unchanged
+  // unless the new option is explicitly enabled.
+  if (entity.ramps === true) {
+    parts.push(...makeAccessRamps({
+      width: entity.rampWidth ?? width,
+      thickness, length,
+      centerY: entity.position[1],
+      groundY: entity.groundY ?? 0,
+      rampLength: entity.rampLength ?? 3,
+      rampThickness: entity.rampThickness ?? 0.2,
+      color: entity.rampColor ?? color,
+    }));
+  }
   return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
+    <RigidBody type="fixed" colliders={false}
       position={entity.position}
       rotation={entity.rotation ?? [0, 0, 0]}
     >
       {parts.map((part) => (
-        <group
-          key={part.id}
-          position={part.position}
-        >
-          <CuboidCollider
-            args={part.size.map(
-              (value) => value / 2
-            )}
-            friction={entity.friction ?? 0.8}
-            restitution={0.1}
-          />
-
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={part.size} />
-
-            <meshStandardMaterial
-              color={part.color}
-              roughness={0.8}
-            />
-          </mesh>
-        </group>
+        <StaticPart key={part.id} part={part}
+          friction={entity.friction ?? 0.8}
+          restitution={entity.restitution ?? 0.1} />
       ))}
     </RigidBody>
   );
 }
-
 
 function ElevatedPath({ entity }) {
-  const size = entity.size ?? [2, 0.2, 8];
-
-  const [width, thickness, length] = size;
-
-  const supportHeight = Math.max(
-    0,
-    entity.supportHeight ?? 1.5
-  );
-
-  const supportWidth = Math.min(
-    width * 0.3,
-    entity.supportWidth ?? 0.3
-  );
-
-  const hasSupports = entity.supports !== false;
-
+  const [width, thickness, length] = entity.size ?? [2, 0.2, 8];
   const color = entity.color ?? "#6b7c86";
-
-  const parts = [
-    {
-      id: "walkway",
-      position: [0, 0, 0],
-      size,
-    },
-  ];
-
-  if (hasSupports && supportHeight > 0) {
-    const supportY =
-      -thickness / 2 - supportHeight / 2;
-
-    const supportZ =
-      length / 2 - supportWidth;
-
-    parts.push(
-      {
-        id: "front-support",
-        position: [0, supportY, -supportZ],
-        size: [
-          supportWidth,
-          supportHeight,
-          supportWidth,
-        ],
-      },
-      {
-        id: "back-support",
-        position: [0, supportY, supportZ],
-        size: [
-          supportWidth,
-          supportHeight,
-          supportWidth,
-        ],
+  const parts = [{
+    id: "walkway", position: [0, 0, 0],
+    size: [width, thickness, length], color,
+  }];
+  if (entity.supports !== false) {
+    const supportHeight = Math.max(0, entity.supportHeight ?? 1.5);
+    const supportWidth = Math.min(width * 0.3, entity.supportWidth ?? 0.3);
+    if (supportHeight > 0) {
+      const y = -thickness / 2 - supportHeight / 2;
+      const z = length / 2 - supportWidth;
+      for (const side of [-1, 1]) {
+        parts.push({
+          id: `support-${side}`, position: [0, y, side * z],
+          size: [supportWidth, supportHeight, supportWidth], color,
+        });
       }
-    );
+    }
   }
-
+  if (entity.rails === true) {
+    const railHeight = entity.railHeight ?? 0.5;
+    const railThickness = Math.min(entity.railThickness ?? 0.12, width / 4);
+    for (const side of [-1, 1]) {
+      parts.push({
+        id: `rail-${side}`,
+        position: [side * (width / 2 - railThickness / 2),
+          thickness / 2 + railHeight / 2, 0],
+        size: [railThickness, railHeight, length],
+        color: entity.railColor ?? color,
+      });
+    }
+  }
+  if (entity.ramps === true) {
+    parts.push(...makeAccessRamps({
+      width: entity.rampWidth ?? width, thickness, length,
+      centerY: entity.position[1],
+      groundY: entity.groundY ?? 0,
+      rampLength: entity.rampLength ?? 3,
+      rampThickness: entity.rampThickness ?? 0.2,
+      color: entity.rampColor ?? color,
+    }));
+  }
   return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
+    <RigidBody type="fixed" colliders={false}
       position={entity.position}
       rotation={entity.rotation ?? [0, 0, 0]}
     >
       {parts.map((part) => (
-        <group
-          key={part.id}
-          position={part.position}
-        >
-          <CuboidCollider
-            args={part.size.map(
-              (value) => value / 2
-            )}
-            friction={entity.friction ?? 0.8}
-            restitution={0.1}
-          />
-
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={part.size} />
-
-            <meshStandardMaterial
-              color={color}
-              metalness={0.15}
-              roughness={0.75}
-            />
-          </mesh>
-        </group>
+        <StaticPart key={part.id} part={part}
+          friction={entity.friction ?? 0.8}
+          restitution={entity.restitution ?? 0.1} />
       ))}
     </RigidBody>
   );
 }
-
 
 function WaterHazard({ entity }) {
   const [splash, setSplash] = useState(null);
@@ -1260,6 +1214,149 @@ function Ledge({ entity }) {
   );
 }
 
+// A gravity-driven annular bowl. Both the visible surface and the Rapier
+// collider use the same triangles, so there is no invisible blocking floor.
+function Funnel({ entity }) {
+  const outerRadius = Math.max(0.7, entity.outerRadius ?? 2);
+  const innerRadius = Math.min(
+    outerRadius - 0.2,
+    Math.max(0.3, entity.innerRadius ?? 0.4)
+  );
+  const depth = Math.max(0.15, entity.depth ?? 1);
+  const segments = Math.max(16, Math.min(96, Math.floor(entity.segments ?? 48)));
+  const rings = Math.max(2, Math.min(24, Math.floor(entity.rings ?? 8)));
+
+  const geometry = useMemo(() => {
+    const vertices = [];
+    const indices = [];
+
+    // Inner edge is at y=-depth, outer rim at y=0.
+    // A slightly curved profile makes the bowl less abrupt at the rim.
+    for (let ring = 0; ring <= rings; ring++) {
+      const t = ring / rings;
+      const radius = innerRadius + (outerRadius - innerRadius) * t;
+      const y = -depth * (1 - t * t);
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        vertices.push(radius * Math.cos(angle), y, radius * Math.sin(angle));
+      }
+    }
+
+    const stride = segments + 1;
+    for (let ring = 0; ring < rings; ring++) {
+      for (let i = 0; i < segments; i++) {
+        const a = ring * stride + i;
+        const b = a + 1;
+        const c = a + stride;
+        const d = c + 1;
+        // Winding points upward and inward for the bowl surface.
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+
+    const mesh = new BufferGeometry();
+    mesh.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+    mesh.setIndex(indices);
+    mesh.computeVertexNormals();
+    return mesh;
+  }, [outerRadius, innerRadius, depth, segments, rings]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  const collider = useMemo(() => [
+    new Float32Array(geometry.getAttribute("position").array),
+    new Uint32Array(geometry.index.array),
+  ], [geometry]);
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders={false}
+      position={entity.position ?? [0, 1, 0]}
+      rotation={entity.rotation ?? [0, 0, 0]}
+    >
+      <TrimeshCollider
+        args={collider}
+        friction={entity.friction ?? 0.35}
+        restitution={entity.restitution ?? 0.05}
+      />
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshStandardMaterial
+          color={entity.color ?? "#607d8b"}
+          metalness={entity.metalness ?? 0.2}
+          roughness={entity.roughness ?? 0.65}
+          side={DoubleSide}
+        />
+      </mesh>
+    </RigidBody>
+  );
+}
+
+// Kinematic pendulum: the pivot stays fixed while the rod and bob swing
+// together in Rapier's fixed physics step. No impulses are scripted on the ball.
+function SwingingPendulum({ entity }) {
+  const bodyRef = useRef(null);
+  const elapsedRef = useRef(0);
+
+  // position is the pivot, not the centre of the bob.
+  const length = Math.max(0.6, entity.length ?? 1.5);
+  const bobRadius = Math.max(0.2, entity.bobRadius ?? 0.45);
+  const rodRadius = Math.max(0.025, entity.rodRadius ?? 0.055);
+  const amplitude = Math.max(0, Math.min(Math.PI / 2.5, entity.amplitude ?? 0.6));
+  const speed = Math.max(0, entity.speed ?? 1.5);
+  const phase = entity.phase ?? 0;
+  const axis = entity.axis === "z" ? "z" : "x";
+  const direction = entity.direction === -1 ? -1 : 1;
+
+  useBeforePhysicsStep(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    elapsedRef.current += 1 / 60;
+    const angle = amplitude * Math.sin(elapsedRef.current * speed + phase) * direction;
+    const half = angle / 2;
+    // Rotate around world Z to sweep along X; around X to sweep along Z.
+    body.setNextKinematicRotation(axis === "x"
+      ? { x: 0, y: 0, z: Math.sin(half), w: Math.cos(half) }
+      : { x: Math.sin(half), y: 0, z: 0, w: Math.cos(half) });
+  });
+
+  return (
+    <RigidBody
+      ref={bodyRef}
+      type="kinematicPosition"
+      colliders={false}
+      position={entity.position ?? [0, 2.2, 3]}
+      canSleep={false}
+    >
+      {/* Narrow physical rod; the sphere is the main striking obstacle. */}
+      <CuboidCollider
+        position={[0, -length / 2, 0]}
+        args={[rodRadius, length / 2, rodRadius]}
+        friction={entity.friction ?? 0.65}
+        restitution={entity.restitution ?? 0.55}
+      />
+      <mesh position={[0, -length / 2, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[rodRadius, rodRadius, length, 12]} />
+        <meshStandardMaterial color={entity.rodColor ?? "#9ca3af"} metalness={0.6} roughness={0.4} />
+      </mesh>
+      <BallCollider
+        position={[0, -length, 0]}
+        args={[bobRadius]}
+        friction={entity.friction ?? 0.65}
+        restitution={entity.restitution ?? 0.55}
+      />
+      <mesh position={[0, -length, 0]} castShadow receiveShadow>
+        <sphereGeometry args={[bobRadius, 24, 16]} />
+        <meshStandardMaterial color={entity.color ?? "#ef4444"} metalness={0.45} roughness={0.4} />
+      </mesh>
+      <mesh castShadow>
+        <sphereGeometry args={[rodRadius * 2.2, 12, 8]} />
+        <meshStandardMaterial color={entity.pivotColor ?? "#374151"} metalness={0.5} roughness={0.4} />
+      </mesh>
+    </RigidBody>
+  );
+}
+
 const OBSTACLE_COMPONENTS = {
   bumper: Bumper,
   block: Block,
@@ -1269,6 +1366,11 @@ const OBSTACLE_COMPONENTS = {
   movingPlatform: MovingPlatform,
   conveyorBelt: ConveyorBelt,
   tunnel: Tunnel,
+  funnel: Funnel,
+  swingingPendulum: SwingingPendulum,
+  verticalLoop: VerticalLoop,
+  horizontalLoop: HorizontalLoop,
+  inclinedLoop: InclinedLoop,
   pipe: Pipe,
   bridge: Bridge,
   elevatedPath: ElevatedPath,

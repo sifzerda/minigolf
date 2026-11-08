@@ -13,7 +13,7 @@ const points = [
 const course12 = {
   id: "course-12",
   number: 12,
-  name: "Switchback Ridge",
+  name: "Pendulum",
   environment: "desert",
   par: 5,
   ballStart: [0, 0.25, 10],
@@ -34,6 +34,26 @@ const course12 = {
     { type: "block", position: [1.9, 0.4, 0.5], size: [3.4, 0.8, 0.45], color: "#8e674a" },
     { type: "block", position: [-1.9, 0.4, -4], size: [3.4, 0.8, 0.45], color: "#8e674a" },
     { type: "bumper", position: [2.7, 0.4, -7.2], radius: 0.45, color: "#cf8752" },
+
+    {
+      type: "swingingPendulum",
+      position: [0, 2.2, 3],
+
+      length: 1.5,
+      bobRadius: 0.45,
+      rodRadius: 0.055,
+
+      amplitude: 0.6,
+      speed: 1.5,
+      axis: "x",
+
+      friction: 0.65,
+      restitution: 0.55,
+
+      color: "#ef4444",
+      rodColor: "#9ca3af",
+    },
+
   ],
 };
 

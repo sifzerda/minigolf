@@ -1,4 +1,4 @@
-// // src/renderers/CourseMapRenderer.jsx
+// src/renderers/CourseMapRenderer.jsx
 
 import { useMemo } from "react";
 

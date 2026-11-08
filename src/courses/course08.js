@@ -7,7 +7,7 @@ const points = [[-3, -10], [3, -10], [3, 10], [-3, 10]];
 const course08 = {
   id: "course-08",
   number: 8,
-  name: "Windmill Valley",
+  name: "Windmill and Tunnel",
   environment: "garden",
   par: 4,
   ballStart: [0, 0.25, 8],
@@ -29,6 +29,22 @@ const course08 = {
     },
     { type: "bumper", position: [-1.7, 0.4, -4], radius: 0.45, color: "#db8f52" },
     { type: "bumper", position: [1.7, 0.4, -5.5], radius: 0.45, color: "#db8f52" },
+
+
+    {
+      type: "tunnel",
+      position: [0, 0.75, -4],
+      size: [2, 1.5, 5],
+
+      thickness: 0.15,
+      floor: false,
+
+      friction: 0.7,
+      color: "#586b76",
+    }
+
+
+
   ],
 };
 

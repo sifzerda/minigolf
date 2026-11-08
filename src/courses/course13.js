@@ -13,7 +13,7 @@ const points = [
 const course13 = {
   id: "course-13",
   number: 13,
-  name: "Twin Windmills",
+  name: "Vertical Loop",
   environment: "garden",
   par: 5,
   ballStart: [0, 0.25, 11],
@@ -30,9 +30,20 @@ const course13 = {
   surfaces: [],
   ramps: [],
   obstacles: [
-    { type: "windmill", position: [-2.15, 0, 3.5], towerWidth: 1.8, towerHeight: 4.4, towerDepth: 1.2, openingWidth: 0.95, openingHeight: 0.9, bladeLength: 2.5, bladeWidth: 0.2, bladeDepth: 0.12, bladeCount: 4, axleHeight: 3.25, speed: 0.8, direction: 1, phase: Math.PI / 4, towerColor: "#c5b29b", roofColor: "#6e4939" },
-    { type: "windmill", position: [2.15, 0, -3.5], towerWidth: 1.8, towerHeight: 4.4, towerDepth: 1.2, openingWidth: 0.95, openingHeight: 0.9, bladeLength: 2.5, bladeWidth: 0.2, bladeDepth: 0.12, bladeCount: 4, axleHeight: 3.25, speed: 1.1, direction: -1, phase: 0, towerColor: "#bca78d", roofColor: "#604737" },
-    { type: "bumper", position: [0, 0.4, 0], radius: 0.55, color: "#e8ae59" },
+
+   {
+    type: "verticalLoop",
+    position: [0, 0, 3],
+    radius: 1.35,
+    width: 1.3,
+    exitOffset: 3.6,
+    approachLength: 1.2,
+    departureLength: 1.2,
+    railHeight: 0.4,
+    friction: 0.65,
+    color: "#facc15",
+  },
+ 
   ],
 };
 

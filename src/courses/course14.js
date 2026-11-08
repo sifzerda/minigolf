@@ -13,7 +13,7 @@ const points = [
 const course14 = {
   id: "course-14",
   number: 14,
-  name: "Frostbite Slalom",
+  name: "Horizontal Loop",
   environment: "snow",
   par: 4,
   ballStart: [0, 0.25, 10],
@@ -30,11 +30,18 @@ const course14 = {
   surfaces: [],
   ramps: [],
   obstacles: [
-    { type: "block", position: [-2.3, 0.45, 5], size: [2.8, 0.9, 0.45], color: "#e3f6fa" },
-    { type: "block", position: [2.3, 0.45, 1], size: [2.8, 0.9, 0.45], color: "#d0ebf7" },
-    { type: "block", position: [-2.3, 0.45, -3], size: [2.8, 0.9, 0.45], color: "#e3f6fa" },
-    { type: "bumper", position: [1.4, 0.4, -7], radius: 0.55, color: "#61c7e5" },
-  ],
+  {
+    type: "horizontalLoop",
+    position: [0, 0, -1],
+    radius: 1.6,
+    width: 1.25,
+    exitOffset: 3.6,
+    approachLength: 1.5,
+    departureLength: 1.5,
+    railHeight: 0.3,
+    color: "#eab308",
+  },
+ ],
 };
 
 export default course14;

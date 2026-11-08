@@ -7,7 +7,7 @@ const points = [[-4, -12], [4, -12], [4, 12], [-4, 12]];
 const course09 = {
   id: "course-09",
   number: 9,
-  name: "Island Crossing",
+  name: "Bridge and ramp",
   environment: "garden",
   par: 5,
   ballStart: [0, 0.25, 10],
@@ -28,6 +28,54 @@ const course09 = {
     { type: "block", position: [0, 0.35, 2], size: [1.5, 0.7, 0.7], color: "#7b6b57" },
     { type: "bumper", position: [-1.5, 0.4, -6], radius: 0.45, color: "#e6bb72" },
     { type: "bumper", position: [1.5, 0.4, -7], radius: 0.45, color: "#e6bb72" },
+ 
+
+{
+  type: "bridge",
+  position: [0, 0.75, -5],
+  size: [1.25, 0.125, 3],
+
+  rails: true,
+  railHeight: 0.25,
+  railThickness: 0.06,
+
+  ramps: true,
+  rampLength: 2,
+  rampThickness: 0.1,
+  groundY: 0,
+
+  friction: 0.8,
+  color: "#80664c",
+  railColor: "#4a3829",
+},
+
+
+
+{
+  type: "elevatedPath",
+  position: [4, 1, -6],
+  size: [1, 0.1, 4],
+
+  supports: true,
+  supportHeight: 0.75,
+  supportWidth: 0.15,
+
+  rails: true,
+  railHeight: 0.25,
+  railThickness: 0.06,
+
+  ramps: true,
+  rampLength: 2,
+  rampThickness: 0.1,
+  groundY: 0,
+
+  friction: 0.8,
+  color: "#6b7c86",
+},
+
+
+ 
+ 
   ],
 };
 

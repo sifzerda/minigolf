@@ -15,6 +15,7 @@ import useGameStore from "../store/useGameStore";
 import { BALL_RADIUS } from "../ecs/constants/physics";
 import { getShotDirection } from "../ecs/systems/ShotSystem";
 import { renderActivity } from "../utils/renderActivity";
+import { useGamePaused } from "../context/GamePauseContext";
 
 // Guide appearance
 const GUIDE_LENGTH = 3;
@@ -31,8 +32,7 @@ const RAY_MARGIN = 0.08;
 const REFRESH_INTERVAL = 200;
 const POSITION_EPSILON = 0.005;
 
-const MAX_POINTS =
-  Math.ceil(GUIDE_LENGTH / GUIDE_STEP) + 1;
+const MAX_POINTS = Math.ceil(GUIDE_LENGTH / GUIDE_STEP) + 1;
 
 const DOWN = { x: 0, y: -1, z: 0 };
 
@@ -58,11 +58,11 @@ function inputsChanged(previous, next) {
   return (
     previous.angle !== next.angle ||
     Math.abs(previous.x - next.x) >
-      POSITION_EPSILON ||
+    POSITION_EPSILON ||
     Math.abs(previous.y - next.y) >
-      POSITION_EPSILON ||
+    POSITION_EPSILON ||
     Math.abs(previous.z - next.z) >
-      POSITION_EPSILON
+    POSITION_EPSILON
   );
 }
 
@@ -71,7 +71,7 @@ export default function AimGuide({
   settledRef,
 }) {
   const { world } = useRapier();
-
+  const paused = useGamePaused();
   const guideRef = useRef(null);
   const previousInput = useRef(null);
   const lastUpdate = useRef(0);
@@ -100,6 +100,7 @@ export default function AimGuide({
   }, [geometry]);
 
   useFrame(() => {
+     if (paused) return;
     const guide = guideRef.current;
     const ball = ballRef.current;
 

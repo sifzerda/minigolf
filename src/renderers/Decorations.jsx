@@ -4,6 +4,8 @@ import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+import { useGamePaused } from "../context/GamePauseContext";
+
 const COUNT = 20;
 const TAU = Math.PI * 2;
 
@@ -118,7 +120,8 @@ function updateInstance(mesh, index, position, rotation, offset) {
 function Decorations({ type = "trees" }) {
   const primaryRef = useRef(null);
   const secondaryRef = useRef(null);
-
+  const paused = useGamePaused();
+  const animationTime = useRef(0);
   const config = CONFIG[type] ?? CONFIG.trees;
 
   const animated = type !== "rocks";
@@ -190,9 +193,12 @@ function Decorations({ type = "trees" }) {
     update(0);
   }, [type]);
 
-  useFrame(({ clock }) => {
-    if (!animated) return;
-    update(clock.getElapsedTime());
+  useFrame((_, delta) => {
+    if (paused || !animated) return;
+
+    animationTime.current += Math.min(delta, 0.05);
+
+    update(animationTime.current);
   });
 
   const secondaryMaterial =

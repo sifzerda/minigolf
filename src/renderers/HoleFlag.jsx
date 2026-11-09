@@ -3,6 +3,7 @@
 import { useMemo, useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useGamePaused } from "../context/GamePauseContext";
 
 export default function HoleFlag({
   position,
@@ -10,7 +11,8 @@ export default function HoleFlag({
   height = 1.8,
 }) {
   const flagRef = useRef(null);
-
+  const paused = useGamePaused();
+  const animationTime = useRef(0);
   const geometry = useMemo(() => {
     const shape = new THREE.PlaneGeometry(
       0.9,
@@ -32,10 +34,12 @@ export default function HoleFlag({
     return () => geometry.dispose();
   }, [geometry]);
 
-  useFrame(({ clock }) => {
-    if (!flagRef.current) return;
+  useFrame((_, delta) => {
+    if (paused || !flagRef.current) return;
 
-    const time = clock.getElapsedTime();
+    animationTime.current += Math.min(delta, 0.05);
+
+    const time = animationTime.current;
     const positions = geometry.attributes.position;
 
     for (let i = 0; i < positions.count; i++) {

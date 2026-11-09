@@ -2,6 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
+import { useGamePaused } from "../context/GamePauseContext";
 
 export default function WaterSplash({
   position,
@@ -10,9 +11,10 @@ export default function WaterSplash({
   const groupRef = useRef(null);
   const elapsedRef = useRef(0);
   const completedRef = useRef(false);
+  const paused = useGamePaused();
 
   useFrame((_, delta) => {
-    if (!groupRef.current) return;
+     if (paused || !groupRef.current) return;
 
     elapsedRef.current += delta;
 

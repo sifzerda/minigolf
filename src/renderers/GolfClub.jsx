@@ -14,15 +14,14 @@ import {
 
 import { BALL_RADIUS } from "../ecs/constants/physics";
 import { renderActivity } from "../utils/renderActivity";
+import { useGamePaused } from "../context/GamePauseContext";
 
 // Animation
 const BACKSWING = 0.65;
 const BACKSWING_SPEED = 4;
-
 const STRIKE_DURATION = 0.085;
 const IMPACT_HOLD = 0.08;
 const RETURN_DURATION = 0.16;
-
 const REST_DISTANCE = BALL_RADIUS + 0.16;
 
 // Club appearance
@@ -45,16 +44,12 @@ const IMPACT_OFFSET =
   (HEAD_DEPTH * CLUB_SCALE) / 2;
 
 // Helpers
-const clamp01 = (value) =>
-  Math.max(0, Math.min(1, value));
-
-const smoothstep = (t) =>
-  t * t * (3 - 2 * t);
+const clamp01 = (value) => Math.max(0, Math.min(1, value));
+const smoothstep = (t) => t * t * (3 - 2 * t);
 
 function getBackswingOffset(power) {
   return (
-    clamp01(power * BACKSWING_SPEED) *
-    BACKSWING
+    clamp01(power * BACKSWING_SPEED) * BACKSWING
   );
 }
 
@@ -69,26 +64,23 @@ export default function GolfClub({
   const elapsed = useRef(0);
   const lastId = useRef(0);
 
+  const paused = useGamePaused();
+
   // Preserve the position where the shot began.
   // Otherwise the club follows the moving ball.
   const strikePosition = useRef(null);
-
   // Preserve the shot while its animation plays.
   const activeShot = useRef(null);
-
   // Preserve the club's actual position when
   // the forward strike begins.
   const strikeStartOffset = useRef(0);
-
-  const visibleColor = useGameStore(
-    (state) => state.clubColor
-  );
-
-  const color =
-    CLUB_COLORS[visibleColor] ??
-    CLUB_COLORS.blue;
+  const visibleColor = useGameStore((state) => state.clubColor);
+  const color = CLUB_COLORS[visibleColor] ?? CLUB_COLORS.blue;
 
   useFrame((_, delta) => {
+
+    if (paused) return;
+
     const ball = ballRef.current;
     const group = root.current;
     const club = motion.current;
@@ -114,8 +106,7 @@ export default function GolfClub({
 
       // Use the actual club position to avoid
       // jumping when charging ends.
-      strikeStartOffset.current =
-        club.position.z;
+      strikeStartOffset.current = club.position.z;
 
       phase.current = "strike";
       elapsed.current = 0;
@@ -134,20 +125,12 @@ export default function GolfClub({
     if (!group.visible) return;
 
     const shot = activeShot.current;
-
-    const angle =
-      active && shot
-        ? shot.angle
-        : state.aimAngle;
-
+    const angle = active && shot ? shot.angle : state.aimAngle;
     const direction = getShotDirection(angle);
 
     // Keep the club at its original shot position
     // during impact and retraction.
-    const position =
-      active && strikePosition.current
-        ? strikePosition.current
-        : ball.translation();
+    const position = active && strikePosition.current ? strikePosition.current : ball.translation();
 
     group.position.set(
       position.x -
@@ -186,8 +169,7 @@ export default function GolfClub({
       // Accelerating movement towards the ball.
       const progress = t * t;
 
-      offset =
-        strikeStartOffset.current +
+      offset = strikeStartOffset.current +
         (
           IMPACT_OFFSET -
           strikeStartOffset.current

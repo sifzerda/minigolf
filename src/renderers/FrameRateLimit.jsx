@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { renderActivity } from "../utils/renderActivity";
+import { useGamePaused } from "../context/GamePauseContext";
 
 const MOVING_TYPES = new Set([
   "movingBarrier",
@@ -22,7 +23,7 @@ export default function FrameRateLimit({
   const lastCameraPosition = useRef(null);
   const lastCameraRotation = useRef(null);
   const cameraActiveUntil = useRef(0);
-
+  const paused = useGamePaused();
   const gl = useThree((state) => state.gl);
   const scene = useThree((state) => state.scene);
   const camera = useThree((state) => state.camera);
@@ -39,7 +40,7 @@ export default function FrameRateLimit({
       !previousPosition ||
       !previousRotation ||
       camera.position.distanceToSquared(previousPosition) >
-        0.000001 ||
+      0.000001 ||
       camera.quaternion.angleTo(previousRotation) > 0.0001;
 
     if (cameraChanged) {
@@ -62,7 +63,7 @@ export default function FrameRateLimit({
       now < cameraActiveUntil.current ||
       now < renderActivity.activeUntil;
 
-    const targetFps = active ? fps : idleFps;
+    const targetFps = paused ? idleFps : active ? fps : idleFps;
     const interval = 1000 / targetFps;
 
     if (now - lastRender.current < interval) {

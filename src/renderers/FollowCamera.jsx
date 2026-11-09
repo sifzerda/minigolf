@@ -3,7 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Vector3, MathUtils } from "three";
-
+import { useGamePaused } from "../context/GamePauseContext";
 import useGameStore from "../store/useGameStore";
 
 const POSITION_EPSILON = 0.0001;
@@ -45,7 +45,7 @@ function getCourseBounds(course) {
 
 export default function FollowCamera({ ballRef, course }) {
   const { camera, size } = useThree();
-
+  const paused = useGamePaused();
   const aimAngle = useGameStore((s) => s.aimAngle);
   const cameraDistance = useGameStore((s) => s.cameraDistance);
   const cameraMode = useGameStore((s) => s.cameraMode);
@@ -60,6 +60,7 @@ export default function FollowCamera({ ballRef, course }) {
   );
 
   useFrame((_, delta) => {
+    if (paused) return;
     const ball = ballRef.current;
     if (!ball) return;
 

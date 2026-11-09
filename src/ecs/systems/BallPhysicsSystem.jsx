@@ -11,6 +11,8 @@ import {
   updateBallMotion,
 } from "./BallMotion";
 
+import { useGamePaused } from "../../context/GamePauseContext";
+
 const DT = 1 / 60;
 
 export default function BallPhysicsSystem({
@@ -19,10 +21,13 @@ export default function BallPhysicsSystem({
   activeSurfaceRef,
 }) {
   const { world } = useRapier();
+  const paused = useGamePaused();
 
   const motion = useRef(createBallMotionState());
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
+
     const ball = ballRef.current;
     if (!ball) return;
 

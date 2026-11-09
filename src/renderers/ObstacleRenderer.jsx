@@ -1,6 +1,6 @@
 // src/renderers/ObstacleRenderer.jsx
 
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { BufferGeometry, Float32BufferAttribute, DoubleSide } from "three";
 import {
   RigidBody,
@@ -10,7 +10,6 @@ import {
   useBeforePhysicsStep,
   useRapier,
 } from "@react-three/rapier";
-import { useState } from "react";
 import useGameStore from "../store/useGameStore";
 import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
@@ -69,7 +68,7 @@ function Block({ entity }) {
   );
 }
 
-function MovingBarrier({ entity }) {
+function MovingBarrier({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
 
@@ -78,15 +77,13 @@ function MovingBarrier({ entity }) {
   const speed = entity.speed ?? 1;
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bodyRef.current;
     if (!body) return;
 
     elapsedRef.current += 1 / 60;
 
-    const offset =
-      Math.sin(elapsedRef.current * speed) *
-      distance;
-
+    const offset = Math.sin(elapsedRef.current * speed) * distance;
     const [x, y, z] = entity.position;
 
     body.setNextKinematicTranslation({
@@ -118,7 +115,7 @@ function MovingBarrier({ entity }) {
   );
 }
 
-function RevolvingGate({ entity }) {
+function RevolvingGate({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
 
@@ -134,6 +131,7 @@ function RevolvingGate({ entity }) {
   // Kinematic motion is updated in the fixed Rapier physics step.
   // The visible blades and their colliders belong to the same rigid body.
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bodyRef.current;
     if (!body) return;
 
@@ -194,37 +192,23 @@ function RevolvingGate({ entity }) {
   );
 }
 
-function MovingPlatform({ entity }) {
+function MovingPlatform({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
-
   const size = entity.size ?? [3, 0.3, 3];
-
-  const axis = ["x", "y", "z"].includes(entity.axis)
-    ? entity.axis
-    : "x";
-
-  const distance = Math.max(
-    0,
-    entity.distance ?? 3
-  );
-
-  const speed = Math.max(
-    0,
-    entity.speed ?? 1
-  );
-
+  const axis = ["x", "y", "z"].includes(entity.axis) ? entity.axis : "x";
+  const distance = Math.max(0, entity.distance ?? 3);
+  const speed = Math.max(0, entity.speed ?? 1);
   const [x, y, z] = entity.position;
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bodyRef.current;
     if (!body) return;
 
     elapsedRef.current += 1 / 60;
 
-    const offset =
-      Math.sin(elapsedRef.current * speed) *
-      distance;
+    const offset = Math.sin(elapsedRef.current * speed) * distance;
 
     body.setNextKinematicTranslation({
       x: x + (axis === "x" ? offset : 0),
@@ -274,7 +258,7 @@ function MovingPlatform({ entity }) {
   );
 }
 
-function ConveyorBelt({ entity, ballRef }) {
+function ConveyorBelt({ entity, paused = false, ballRef }) {
   const { world } = useRapier();
 
   const size = entity.size ?? [3, 0.2, 5];
@@ -282,18 +266,14 @@ function ConveyorBelt({ entity, ballRef }) {
 
   const speed = entity.speed ?? 2;
   const acceleration = entity.acceleration ?? 8;
-
   const direction = entity.direction ?? [0, 0, -1];
-
-  const length = Math.hypot(
-    direction[0],
-    direction[2]
-  ) || 1;
+  const length = Math.hypot(direction[0], direction[2]) || 1;
 
   const dx = direction[0] / length;
   const dz = direction[2] / length;
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const ball = ballRef?.current;
 
     if (!ball) return;
@@ -301,37 +281,19 @@ function ConveyorBelt({ entity, ballRef }) {
     const position = ball.translation();
     const velocity = ball.linvel();
 
-    const withinX =
-      Math.abs(position.x - x) <= size[0] / 2;
-
-    const withinZ =
-      Math.abs(position.z - z) <= size[2] / 2;
-
+    const withinX = Math.abs(position.x - x) <= size[0] / 2;
+    const withinZ = Math.abs(position.z - z) <= size[2] / 2;
     const surfaceY = y + size[1] / 2;
 
-    const onBelt =
-      Math.abs(
-        position.y - surfaceY - 0.25
-      ) < 0.15;
+    const onBelt = Math.abs(position.y - surfaceY - 0.25) < 0.15;
 
     if (!withinX || !withinZ || !onBelt) {
       return;
     }
 
-    const currentSpeed =
-      velocity.x * dx + velocity.z * dz;
-
-    const speedDifference =
-      speed - currentSpeed;
-
-    const correction = Math.max(
-      -acceleration / 60,
-      Math.min(
-        acceleration / 60,
-        speedDifference
-      )
-    );
-
+    const currentSpeed = velocity.x * dx + velocity.z * dz;
+    const speedDifference = speed - currentSpeed;
+    const correction = Math.max(-acceleration / 60, Math.min(acceleration / 60, speedDifference));
     const mass = ball.mass();
 
     ball.applyImpulse(
@@ -652,7 +614,7 @@ function ElevatedPath({ entity }) {
   );
 }
 
-function WaterHazard({ entity }) {
+function WaterHazard({ entity, paused = false }) {
   const [splash, setSplash] = useState(null);
   const triggeredRef = useRef(false);
 
@@ -663,6 +625,7 @@ function WaterHazard({ entity }) {
     entity.respawnPosition ?? [0, 0.5, 0];
 
   function onEnter(event) {
+    if (paused) return;
     const ball = event.other.rigidBody;
     const ballObject = event.other.rigidBodyObject;
 
@@ -756,7 +719,7 @@ function WaterHazard({ entity }) {
   );
 }
 
-function Turnstile({ entity }) {
+function Turnstile({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
 
@@ -776,6 +739,7 @@ function Turnstile({ entity }) {
       : size[0] / 2;
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bodyRef.current;
     if (!body) return;
 
@@ -840,7 +804,7 @@ function Turnstile({ entity }) {
 }
 
 
-function Windmill({ entity }) {
+function Windmill({ entity, paused = false }) {
   const bladesRef = useRef(null);
   const angleRef = useRef(entity.phase ?? 0);
 
@@ -937,6 +901,7 @@ function Windmill({ entity }) {
   ];
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bladesRef.current;
     if (!body) return;
 
@@ -1294,7 +1259,7 @@ function Funnel({ entity }) {
 
 // Kinematic pendulum: the pivot stays fixed while the rod and bob swing
 // together in Rapier's fixed physics step. No impulses are scripted on the ball.
-function SwingingPendulum({ entity }) {
+function SwingingPendulum({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
 
@@ -1309,6 +1274,7 @@ function SwingingPendulum({ entity }) {
   const direction = entity.direction === -1 ? -1 : 1;
 
   useBeforePhysicsStep(() => {
+    if (paused) return;
     const body = bodyRef.current;
     if (!body) return;
     elapsedRef.current += 1 / 60;
@@ -1380,10 +1346,10 @@ const OBSTACLE_COMPONENTS = {
   ledge: Ledge,
 };
 
-export default function ObstacleRenderer({ entity, ballRef }) {
+export default function ObstacleRenderer({ entity, ballRef, paused = false }) {
   const Component = OBSTACLE_COMPONENTS[entity.type];
 
   if (!Component) return null;
 
-  return <Component entity={entity} ballRef={ballRef} />;
+  return <Component entity={entity} ballRef={ballRef} paused={paused} />;
 }

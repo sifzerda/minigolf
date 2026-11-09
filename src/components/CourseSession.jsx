@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { setupGame, clearGame } from "../ecs/setupGame";
 import { getCourse } from "../courses";
-
 import GolfScene from "./GolfScene";
 
-export default function CourseSession({ courseIndex }) {
+export default function CourseSession({
+  courseIndex,
+  paused = false,
+}) {
   const [loadedCourse, setLoadedCourse] = useState(null);
   const course = getCourse(courseIndex);
 
@@ -28,5 +30,5 @@ export default function CourseSession({ courseIndex }) {
     return null;
   }
 
-  return <GolfScene course={course} />;
+  return <GolfScene course={course} paused={paused} />;
 }

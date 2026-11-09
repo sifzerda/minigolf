@@ -349,9 +349,9 @@ export default function CourseMapRenderer({ course }) {
 
   const scale = Math.min(
     (WIDTH - PADDING * 2) /
-      Math.max(1, bounds.maxX - bounds.minX),
+    Math.max(1, bounds.maxX - bounds.minX),
     (HEIGHT - PADDING * 2) /
-      Math.max(1, bounds.maxZ - bounds.minZ)
+    Math.max(1, bounds.maxZ - bounds.minZ)
   );
 
   const centerX = (bounds.minX + bounds.maxX) / 2;
@@ -385,7 +385,7 @@ export default function CourseMapRenderer({ course }) {
   return (
     <svg
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      className="course-preview-map"
+      className="block h-auto max-h-[500px] w-full rounded-xl"
       role="img"
       aria-label={`Map of ${course.name}`}
     >

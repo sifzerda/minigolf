@@ -19,6 +19,7 @@ import GameCompleteScreen from "../screens/GameCompleteScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { Pause } from "lucide-react";
 import PauseScreen from "../screens/PauseScreen";
+import AchievementsScreen from "../screens/AchievementsScreen";
 
 import FrameRateLimit from "../renderers/FrameRateLimit";
 import { renderActivity } from "../utils/renderActivity";
@@ -264,7 +265,19 @@ export default function GolfGame() {
                 <MenuScreen
                     onPlay={() => setScreen("select")}
                     onSelectCourses={() => setScreen("select")}
+                    onAchievements={() => setScreen("achievements")}
                     onSettings={() => setScreen("settings")}
+                />
+            </div>
+        );
+    }
+
+    // Achievements
+    if (screen === "achievements") {
+        return (
+            <div className={containerClass}>
+                <AchievementsScreen
+                    onBack={handleMainMenu}
                 />
             </div>
         );

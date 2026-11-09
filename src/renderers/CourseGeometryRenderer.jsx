@@ -403,11 +403,16 @@ function CourseWall({ wall }) {
   );
 }
 
+
 function GolfCup({ hole }) {
   const radius = hole.radius;
   const depth = hole.depth ?? 0.8;
 
   const [x, y, z] = hole.position;
+
+  // Silver rim appearance
+  const rimThickness = 0.012;
+  const rimHeight = 0.008;
 
   return (
     <RigidBody
@@ -415,6 +420,30 @@ function GolfCup({ hole }) {
       colliders={false}
       position={[x, y, z]}
     >
+      {/* Thin metallic silver rim */}
+      <mesh
+        position={[0, rimHeight, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <torusGeometry
+          args={[
+            radius,
+            rimThickness,
+            8,
+            64,
+          ]}
+        />
+
+        <meshStandardMaterial
+          color="#c0c0c0"
+          metalness={0.85}
+          roughness={0.22}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Interior cup wall */}
       <mesh
         position={[0, -depth / 2, 0]}
         receiveShadow
@@ -437,6 +466,7 @@ function GolfCup({ hole }) {
         />
       </mesh>
 
+      {/* Cup bottom collider */}
       <CuboidCollider
         args={[
           radius * 0.7,
@@ -448,6 +478,7 @@ function GolfCup({ hole }) {
         restitution={0}
       />
 
+      {/* Cup bottom */}
       <mesh
         position={[0, -depth, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -462,6 +493,7 @@ function GolfCup({ hole }) {
     </RigidBody>
   );
 }
+
 
 export default function CourseGeometryRenderer({
   course,
@@ -479,8 +511,7 @@ export default function CourseGeometryRenderer({
           key={section.id ?? index}
           section={section}
           hole={
-            section.type === "floor" &&
-            section.id === "main-floor"
+            section.type === "floor" && section.id === "main-floor"
               ? course.hole
               : null
           }

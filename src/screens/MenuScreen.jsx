@@ -1,12 +1,20 @@
 // src/screens/MenuScreen.jsx
 
-import { Flag, Play, Trophy, Settings } from "lucide-react";
+import {
+  Flag,
+  Play,
+  Trophy,
+  Settings,
+  Medal,
+} from "lucide-react";
+
 import { TOTAL_COURSES } from "../courses";
 import useGameStore from "../store/useGameStore";
 
 export default function MenuScreen({
   onPlay,
   onSelectCourses,
+  onAchievements,
   onSettings,
 }) {
   const bestScores = useGameStore((s) => s.bestScores);
@@ -66,6 +74,15 @@ export default function MenuScreen({
           >
             <Flag size={18} />
             Select Course
+          </button>
+
+          <button
+            type="button"
+            onClick={onAchievements}
+            className={secondaryButton}
+          >
+            <Medal size={18} />
+            Achievements
           </button>
 
           <button

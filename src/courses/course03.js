@@ -68,10 +68,10 @@ const course03 = {
     {
       id: "water-launch-ramp",
       position: [0, 0, -2],
-      size: [2.4, 0.65, 1.6],
+      size: [2.0, 0.65, 1.6],
       angle: 0,
       surface: "concrete",
-      color: "#b8a58a",
+      color: "#CCFF00",
     },
   ],
 

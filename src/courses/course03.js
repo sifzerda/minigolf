@@ -44,45 +44,38 @@ const course03 = {
 
   walls: createPolygonWalls({ points }),
 
-  surfaces: [],
-
-  ramps: [],
-
-  obstacles: [
+  surfaces: [
     {
-      type: "bumper",
-      position: [0, 0.4, 0],
-      radius: 0.4,
-    },
-
-    {
-      type: "waterHazard",
-      position: [0, -0.15, -5],
-      size: [4, 0.5, 3],
+      id: "water-01",
+      type: "water",
+      position: [0, 0, -5],
+      points: [
+        [-3, -4],
+        [0, -3],
+        [2, -4],
+        [3, -6],
+        [1, -8],
+        [-2, -7],
+      ],
+      depth: 0.65,
       color: "#1479a8",
+      basinColor: "#52636a",
       respawnPosition: [0, 0.5, -2],
     },
-
-    {
-      type: "rotatingGate",
-      position: [-1.5, 0.65, -5],
-      size: [1.5, 1, 0.2],
-      pivot: "left",
-      direction: 1,
-      speed: 1,
-      phase: 0,
-    },
-    {
-      type: "rotatingGate",
-      position: [1.5, 0.65, -5],
-      size: [1.5, 1, 0.2],
-      pivot: "right",
-      direction: -1,
-      speed: 1,
-      phase: 0,
-    },
-
   ],
+
+  ramps: [
+    {
+      id: "water-launch-ramp",
+      position: [0, 0, -2],
+      size: [2.4, 0.65, 1.6],
+      angle: 0,
+      surface: "concrete",
+      color: "#b8a58a",
+    },
+  ],
+
+  obstacles: [],
 };
 
 export default course03;

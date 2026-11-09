@@ -1,10 +1,7 @@
 // src/screens/SettingsScreen.jsx
 
 import { Check, ArrowLeft } from "lucide-react";
-
-import useGameStore, {
-  CLUB_COLORS,
-} from "../store/useGameStore";
+import useGameStore, { CLUB_COLORS } from "../store/useGameStore";
 
 export default function SettingsScreen({ onBack }) {
   const clubColor = useGameStore((s) => s.clubColor);

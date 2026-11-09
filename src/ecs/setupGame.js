@@ -21,15 +21,7 @@ export function setupGame(course) {
   const [startX, startY, startZ] = course.ballStart;
 
   const ballPosition = course.terrain
-    ? [
-        startX,
-        getTerrainHeight(
-          startX,
-          startZ,
-          course.terrain
-        ) + BALL_RADIUS + 0.05,
-        startZ,
-      ]
+    ? [ startX, getTerrainHeight(startX, startZ, course.terrain) + BALL_RADIUS + 0.05, startZ ]
     : [startX, startY, startZ];
 
   // Golf ball.
@@ -48,15 +40,15 @@ export function setupGame(course) {
     radius: course.hole.radius,
   });
 
-  // Surface entities.
-  (course.surfaces ?? []).forEach(
-    (surface, index) => {
-      world.add({
-        ...surface,
-        id: `${course.id}-surface-${index}`,
-      });
-    }
-  );
+  // Surface entities
+  (course.surfaces ?? []).forEach((surface, index) => {
+    world.add({
+      ...surface,
+      id: surface.id ?? `${course.id}-surface-${index}`,
+      surface: surface.surface ?? surface.type ?? "grass",
+      respawnPosition: surface.respawnPosition ?? [...ballPosition],
+    });
+  });
 
   // Ramp entities.
   (course.ramps ?? []).forEach(
@@ -76,9 +68,7 @@ export function setupGame(course) {
         ...obstacle,
         obstacle: true,
         id: `${course.id}-obstacle-${index}`,
-        respawnPosition:
-          obstacle.respawnPosition ??
-          [...ballPosition],
+        respawnPosition: obstacle.respawnPosition ?? [...ballPosition],
       });
     }
   );

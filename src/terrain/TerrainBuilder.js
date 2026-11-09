@@ -1,6 +1,7 @@
 // src/terrain/TerrainBuilder.js
 
 import * as THREE from "three";
+import polygonClipping from "polygon-clipping";
 
 import {
   getTerrainHeight,
@@ -10,7 +11,128 @@ import {
 import { getTerrainSurface } from "./TerrainRegions";
 import { getTerrainMaterial } from "./TerrainMaterials";
 
-export function buildTerrain(terrain) {
+function closeRing(points) {
+  if (points.length < 3) return [];
+
+  const ring = points.map(([x, z]) => [x, z]);
+
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring.push([...first]);
+  }
+
+  return ring;
+}
+
+function getExteriorPolygons(width, length, sections) {
+  const halfWidth = width / 2;
+  const halfLength = length / 2;
+
+  const boundary = [[closeRing([
+    [-halfWidth, -halfLength],
+    [halfWidth, -halfLength],
+    [halfWidth, halfLength],
+    [-halfWidth, halfLength],
+  ])]];
+
+  const exclusions = sections
+    .filter(
+      (section) =>
+        section.type === "floor" &&
+        Array.isArray(section.points) &&
+        section.points.length >= 3
+    )
+    .map((section) => [
+      [closeRing(section.points)],
+    ]);
+
+  if (exclusions.length === 0) {
+    return boundary;
+  }
+
+  return polygonClipping.difference(
+    boundary,
+    ...exclusions
+  );
+}
+
+function triangulatePolygon(polygon) {
+  const toVectors = (ring) =>
+    ring.slice(0, -1).map(
+      ([x, z]) => new THREE.Vector2(x, z)
+    );
+
+  const contour = toVectors(polygon[0]);
+  const holes = polygon.slice(1).map(toVectors);
+
+  if (contour.length < 3) return [];
+
+  const triangles = THREE.ShapeUtils.triangulateShape(
+    contour,
+    holes
+  );
+
+  const points = [
+    ...contour,
+    ...holes.flat(),
+  ];
+
+  return triangles.map(([a, b, c]) => [
+    points[a],
+    points[b],
+    points[c],
+  ]);
+}
+
+function subdivideTriangle(a, b, c, maxEdge, emit) {
+  const stack = [[a, b, c]];
+  const maxEdgeSquared = maxEdge * maxEdge;
+
+  while (stack.length > 0) {
+    const [p0, p1, p2] = stack.pop();
+
+    const edges = [
+      [p0, p1, p2],
+      [p1, p2, p0],
+      [p2, p0, p1],
+    ];
+
+    let longest = edges[0];
+    let longestLength = -1;
+
+    for (const edge of edges) {
+      const dx = edge[0].x - edge[1].x;
+      const dz = edge[0].y - edge[1].y;
+      const length = dx * dx + dz * dz;
+
+      if (length > longestLength) {
+        longestLength = length;
+        longest = edge;
+      }
+    }
+
+    if (longestLength <= maxEdgeSquared) {
+      emit(p0, p1, p2);
+      continue;
+    }
+
+    const [start, end, opposite] = longest;
+
+    const midpoint = new THREE.Vector2(
+      (start.x + end.x) / 2,
+      (start.y + end.y) / 2
+    );
+
+    stack.push(
+      [start, midpoint, opposite],
+      [midpoint, end, opposite]
+    );
+  }
+}
+
+export function buildTerrain(terrain, floorSections = []) {
   if (!terrain) {
     throw new Error("Terrain configuration is required");
   }
@@ -26,7 +148,8 @@ export function buildTerrain(terrain) {
     !Number.isFinite(length) ||
     !Number.isFinite(resolution) ||
     width <= 0 ||
-    length <= 0
+    length <= 0 ||
+    resolution < 2
   ) {
     throw new Error("Invalid terrain dimensions");
   }
@@ -35,56 +158,105 @@ export function buildTerrain(terrain) {
 
   const preparedFeatures = prepareTerrainFeatures(terrain);
 
+  const polygons = getExteriorPolygons(
+    width,
+    length,
+    floorSections
+  );
+
+  const maxEdge = Math.max(
+    width / segments,
+    length / segments
+  );
+
   const vertices = [];
   const indices = [];
   const uvs = [];
   const colors = [];
 
-  const stride = segments + 1;
+  // Reuse vertices so normals can be averaged
+  // across neighbouring triangles.
+  const vertexLookup = new Map();
 
-  for (let z = 0; z <= segments; z++) {
-    for (let x = 0; x <= segments; x++) {
-      const worldX = (x / segments - 0.5) * width;
-      const worldZ = (z / segments - 0.5) * length;
+  function addVertex(point) {
+    const x = point.x;
+    const z = point.y;
 
-      const y = getTerrainHeight(
-        worldX,
-        worldZ,
-        terrain,
-        preparedFeatures
+    const key = `${x.toFixed(7)},${z.toFixed(7)}`;
+
+    if (vertexLookup.has(key)) {
+      return vertexLookup.get(key);
+    }
+
+    const y = getTerrainHeight(
+      x,
+      z,
+      terrain,
+      preparedFeatures
+    );
+
+    if (!Number.isFinite(y)) {
+      throw new Error(
+        `Invalid terrain height at ${x}, ${z}`
       );
+    }
 
-      if (!Number.isFinite(y)) {
-        throw new Error(
-          `Invalid terrain height at ${worldX}, ${worldZ}`
-        );
-      }
+    const index = vertices.length / 3;
 
-      vertices.push(worldX, y, worldZ);
-      uvs.push(x / segments, z / segments);
+    vertices.push(x, y, z);
 
-      const surface = getTerrainSurface(
-        worldX,
-        worldZ,
-        terrain
-      );
+    uvs.push(
+      x / width + 0.5,
+      z / length + 0.5
+    );
 
-      const material = getTerrainMaterial(surface);
-      const color = new THREE.Color(material.color);
+    const surface = getTerrainSurface(
+      x,
+      z,
+      terrain
+    );
 
-      colors.push(color.r, color.g, color.b);
+    const material = getTerrainMaterial(surface);
+    const color = new THREE.Color(material.color);
+
+    colors.push(color.r, color.g, color.b);
+
+    vertexLookup.set(key, index);
+
+    return index;
+  }
+
+  function addTriangle(a, b, c) {
+    const area =
+      (b.x - a.x) * (c.y - a.y) -
+      (b.y - a.y) * (c.x - a.x);
+
+    if (Math.abs(area) < 1e-12) return;
+
+    const ia = addVertex(a);
+    const ib = addVertex(b);
+    const ic = addVertex(c);
+
+    // XZ triangles need clockwise winding when
+    // viewed from above to produce upward normals.
+    if (area < 0) {
+      indices.push(ia, ib, ic);
+    } else {
+      indices.push(ia, ic, ib);
     }
   }
 
-  for (let z = 0; z < segments; z++) {
-    for (let x = 0; x < segments; x++) {
-      const a = z * stride + x;
-      const b = a + 1;
-      const c = a + stride;
-      const d = c + 1;
+  for (const polygon of polygons) {
+    const triangles = triangulatePolygon(polygon);
 
-      indices.push(a, c, b);
-      indices.push(b, c, d);
+    for (const [a, b, c] of triangles) {
+      subdivideTriangle(
+        a,
+        b,
+        c,
+        maxEdge,
+        addTriangle
+      );
     }
   }
 
@@ -106,6 +278,7 @@ export function buildTerrain(terrain) {
   );
 
   geometry.setIndex(indices);
+
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
 

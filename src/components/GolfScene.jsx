@@ -104,7 +104,7 @@ export default function GolfScene({
         paused={paused}
       >
         {course.terrain && (
-          <TerrainRenderer terrain={course.terrain} />
+          <TerrainRenderer terrain={course.terrain} sections={course.sections} />
         )}
 
         <CourseGeometryRenderer course={course} />
@@ -113,6 +113,7 @@ export default function GolfScene({
           <SurfaceRenderer
             key={entity.id}
             entity={entity}
+            sections={course.sections ?? []}
           />
         ))}
 

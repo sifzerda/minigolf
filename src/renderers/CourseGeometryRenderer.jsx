@@ -1,160 +1,402 @@
 // src/renderers/CourseGeometryRenderer.jsx
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import * as THREE from "three";
+import polygonClipping from "polygon-clipping";
+
 import {
   RigidBody,
   CuboidCollider,
   TrimeshCollider,
-  CylinderCollider,
 } from "@react-three/rapier";
 
-import {
-  Shape,
-  Path,
-  ShapeGeometry,
-  DoubleSide,
-} from "three";
+const EPSILON = 1e-6;
+const CIRCLE_SEGMENTS = 64;
 
-function createPolygonGeometry(section, hole) {
-  const shape = new Shape();
-
-  section.points.forEach(([x, z], index) => {
-    if (index === 0) {
-      shape.moveTo(x, -z);
-    } else {
-      shape.lineTo(x, -z);
-    }
-  });
-
-  shape.closePath();
-
-  if (hole) {
-    const [hx, , hz] = hole.position;
-
-    const opening = new Path();
-
-    opening.absarc(
-      hx,
-      -hz,
-      hole.radius,
-      0,
-      Math.PI * 2,
-      true
-    );
-
-    shape.holes.push(opening);
+function closeRing(points) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return [];
   }
 
-  const geometry = new ShapeGeometry(shape, 64);
-  geometry.rotateX(-Math.PI / 2);
+  const ring = points.map(([x, z]) => [x, z]);
+
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+
+  if (
+    Math.abs(first[0] - last[0]) > EPSILON ||
+    Math.abs(first[1] - last[1]) > EPSILON
+  ) {
+    ring.push([...first]);
+  }
+
+  return ring;
+}
+
+function makeCircleRing(x, z, radius) {
+  const points = [];
+
+  for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
+    const angle =
+      (i / CIRCLE_SEGMENTS) * Math.PI * 2;
+
+    points.push([
+      x + Math.cos(angle) * radius,
+      z + Math.sin(angle) * radius,
+    ]);
+  }
+
+  return closeRing(points);
+}
+
+function makeWaterRing(surface) {
+  // Irregular water regions.
+  if (
+    Array.isArray(surface.points) &&
+    surface.points.length >= 3
+  ) {
+    return closeRing(surface.points);
+  }
+
+  // Rectangular water regions.
+  if (!surface.position || !surface.size) {
+    return [];
+  }
+
+  const [x, , z] = surface.position;
+  const [width, length] = surface.size;
+
+  const hw = width / 2;
+  const hl = length / 2;
+
+  return closeRing([
+    [x - hw, z - hl],
+    [x + hw, z - hl],
+    [x + hw, z + hl],
+    [x - hw, z + hl],
+  ]);
+}
+
+function getWaterSurfaces(surfaces) {
+  return surfaces.filter(
+    (surface) =>
+      (surface.surface ?? surface.type) === "water"
+  );
+}
+
+function subtractFloorRegions(
+  section,
+  hole,
+  surfaces
+) {
+  const floorRing = closeRing(section.points);
+
+  if (floorRing.length < 4) {
+    return [];
+  }
+
+  const floor = [[floorRing]];
+  const cutouts = [];
+
+  // Golf cup opening.
+  if (hole) {
+    const [x, , z] = hole.position;
+
+    cutouts.push([
+      [makeCircleRing(x, z, hole.radius)],
+    ]);
+  }
+
+  // Water openings.
+  for (const water of getWaterSurfaces(surfaces)) {
+    const ring = makeWaterRing(water);
+
+    if (ring.length < 4) {
+      continue;
+    }
+
+    cutouts.push([[ring]]);
+  }
+
+  if (cutouts.length === 0) {
+    return floor;
+  }
+
+  return polygonClipping.difference(
+    floor,
+    ...cutouts
+  );
+}
+
+function polygonToGeometry(polygon) {
+  const toVectors = (ring) =>
+    ring.slice(0, -1).map(
+      ([x, z]) => new THREE.Vector2(x, z)
+    );
+
+  const contour = toVectors(polygon[0]);
+  const holes = polygon.slice(1).map(toVectors);
+
+  if (contour.length < 3) {
+    return null;
+  }
+
+  const triangles =
+    THREE.ShapeUtils.triangulateShape(
+      contour,
+      holes
+    );
+
+  const points = [
+    ...contour,
+    ...holes.flat(),
+  ];
+
+  const positions = [];
+  const indices = [];
+
+  for (const point of points) {
+    positions.push(
+      point.x,
+      0,
+      point.y
+    );
+  }
+
+  for (const [a, b, c] of triangles) {
+    const p0 = points[a];
+    const p1 = points[b];
+    const p2 = points[c];
+
+    const area =
+      (p1.x - p0.x) * (p2.y - p0.y) -
+      (p1.y - p0.y) * (p2.x - p0.x);
+
+    if (Math.abs(area) < EPSILON) {
+      continue;
+    }
+
+    // Correct upward-facing XZ winding.
+    if (area < 0) {
+      indices.push(a, b, c);
+    } else {
+      indices.push(a, c, b);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      positions,
+      3
+    )
+  );
+
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
   return geometry;
 }
 
-function createColliderData(geometry) {
-  const source = geometry.index
-    ? geometry.toNonIndexed()
-    : geometry;
-
-  const attribute = source.getAttribute("position");
-
-  const vertices = new Float32Array(attribute.array);
-
-  const indices = new Uint32Array(
-    Array.from(
-      { length: attribute.count },
-      (_, index) => index
-    )
+function createFloorGeometries(
+  section,
+  hole,
+  surfaces
+) {
+  const polygons = subtractFloorRegions(
+    section,
+    hole,
+    surfaces
   );
 
-  if (source !== geometry) {
-    source.dispose();
-  }
+  return polygons
+    .map(polygonToGeometry)
+    .filter(Boolean);
+}
+
+function createColliderData(geometry) {
+  const position =
+    geometry.getAttribute("position");
+
+  const vertices = new Float32Array(
+    position.array
+  );
+
+  const indices = geometry.index
+    ? new Uint32Array(
+        geometry.index.array
+      )
+    : new Uint32Array(
+        Array.from(
+          { length: position.count },
+          (_, index) => index
+        )
+      );
 
   return [vertices, indices];
 }
 
-export function CourseSection({ section, hole }) {
-  const isFloor = section.type === "floor";
+function FloorPiece({
+  geometry,
+  color,
+  friction,
+}) {
+  const colliderData = useMemo(
+    () => createColliderData(geometry),
+    [geometry]
+  );
 
-  const geometry = useMemo(() => {
-    if (!isFloor) return null;
-
-    return createPolygonGeometry(section, hole);
-  }, [section, hole, isFloor]);
-
-  const colliderData = useMemo(() => {
-    if (!geometry) return null;
-
-    return createColliderData(geometry);
-  }, [geometry]);
-
-  if (!isFloor) {
-    return (
-      <RigidBody
-        type="fixed"
-        colliders={false}
-        position={section.position}
-        rotation={section.rotation ?? [0, 0, 0]}
-      >
-        <CuboidCollider
-          args={section.size.map((v) => v / 2)}
-          friction={section.friction ?? 0.85}
-        />
-
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={section.size} />
-
-          <meshStandardMaterial
-            color={section.color ?? "#25834a"}
-            roughness={0.9}
-          />
-        </mesh>
-      </RigidBody>
-    );
+  if (colliderData[1].length === 0) {
+    return null;
   }
 
   return (
     <RigidBody
       type="fixed"
       colliders={false}
-      position={[0, section.y ?? 0, 0]}
     >
       <TrimeshCollider
         args={colliderData}
-        friction={section.friction ?? 0.85}
+        friction={friction}
+        restitution={0.1}
       />
 
-      <mesh geometry={geometry} receiveShadow>
+      <mesh
+        geometry={geometry}
+        receiveShadow
+      >
         <meshStandardMaterial
-          color={section.color ?? "#25834a"}
+          color={color}
           roughness={0.95}
-          side={DoubleSide}
+          metalness={0}
+          side={THREE.DoubleSide}
         />
       </mesh>
     </RigidBody>
   );
 }
 
-export function CourseWall({ wall }) {
+function FloorSection({
+  section,
+  hole,
+  surfaces,
+}) {
+  const geometries = useMemo(
+    () =>
+      createFloorGeometries(
+        section,
+        hole,
+        surfaces
+      ),
+    [section, hole, surfaces]
+  );
+
+  useEffect(() => {
+    return () => {
+      geometries.forEach(
+        (geometry) => geometry.dispose()
+      );
+    };
+  }, [geometries]);
+
+  return (
+    <group position={[0, section.y ?? 0, 0]}>
+      {geometries.map((geometry, index) => (
+        <FloorPiece
+          key={index}
+          geometry={geometry}
+          color={section.color ?? "#328b50"}
+          friction={section.friction ?? 0.85}
+        />
+      ))}
+    </group>
+  );
+}
+
+function BoxSection({ section }) {
+  const size = section.size ?? [
+    section.width ?? 1,
+    section.height ?? 0.2,
+    section.length ?? 1,
+  ];
+
+  const position = section.position ?? [
+    0,
+    section.y ?? 0,
+    0,
+  ];
+
   return (
     <RigidBody
       type="fixed"
       colliders={false}
-      position={wall.position}
-      rotation={wall.rotation ?? [0, 0, 0]}
+      position={position}
+      rotation={section.rotation ?? [0, 0, 0]}
     >
       <CuboidCollider
-        args={wall.size.map((v) => v / 2)}
-        friction={0.7}
-        restitution={0.35}
+        args={size.map((value) => value / 2)}
+        friction={section.friction ?? 0.85}
+        restitution={section.restitution ?? 0.1}
       />
 
       <mesh castShadow receiveShadow>
-        <boxGeometry args={wall.size} />
+        <boxGeometry args={size} />
+
+        <meshStandardMaterial
+          color={section.color ?? "#328b50"}
+          roughness={0.95}
+        />
+      </mesh>
+    </RigidBody>
+  );
+}
+
+function CourseSection({
+  section,
+  hole,
+  surfaces,
+}) {
+  if (section.type === "floor") {
+    return (
+      <FloorSection
+        section={section}
+        hole={hole}
+        surfaces={surfaces}
+      />
+    );
+  }
+
+  return <BoxSection section={section} />;
+}
+
+function CourseWall({ wall }) {
+  const size = wall.size ?? [
+    wall.length ?? 1,
+    wall.height ?? 0.8,
+    wall.thickness ?? 0.2,
+  ];
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders={false}
+      position={wall.position ?? [0, 0, 0]}
+      rotation={wall.rotation ?? [0, 0, 0]}
+    >
+      <CuboidCollider
+        args={size.map((value) => value / 2)}
+        friction={wall.friction ?? 0.8}
+        restitution={wall.restitution ?? 0.4}
+      />
+
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={size} />
 
         <meshStandardMaterial
           color={wall.color ?? "#795548"}
+          roughness={0.85}
         />
       </mesh>
     </RigidBody>
@@ -163,103 +405,99 @@ export function CourseWall({ wall }) {
 
 function GolfCup({ hole }) {
   const radius = hole.radius;
-  const depth = 0.8;
+  const depth = hole.depth ?? 0.8;
 
-  const wallCollider = useMemo(() => {
-    const vertices = [];
-    const indices = [];
-    const segments = 48;
-
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
-
-      vertices.push(x, 0, z);
-      vertices.push(x, -depth, z);
-    }
-
-    for (let i = 0; i < segments; i++) {
-      const a = i * 2;
-
-      indices.push(a, a + 1, a + 2);
-      indices.push(a + 1, a + 3, a + 2);
-    }
-
-    return [
-      new Float32Array(vertices),
-      new Uint32Array(indices),
-    ];
-  }, [radius]);
+  const [x, y, z] = hole.position;
 
   return (
-    <group position={hole.position}>
-      <RigidBody type="fixed" colliders={false}>
-        <TrimeshCollider
-          args={wallCollider}
-          friction={0.65}
-        />
-
-        <CylinderCollider
-          args={[0.05, radius]}
-          position={[0, -depth - 0.05, 0]}
-        />
-      </RigidBody>
-
-      <mesh position={[0, -depth / 2, 0]}>
+    <RigidBody
+      type="fixed"
+      colliders={false}
+      position={[x, y, z]}
+    >
+      <mesh
+        position={[0, -depth / 2, 0]}
+        receiveShadow
+      >
         <cylinderGeometry
-          args={[radius, radius, depth, 48, 1, true]}
+          args={[
+            radius,
+            radius,
+            depth,
+            48,
+            1,
+            true,
+          ]}
         />
 
         <meshStandardMaterial
-          color="#d9d9d9"
-          side={DoubleSide}
+          color="#171717"
+          side={THREE.DoubleSide}
+          roughness={0.95}
         />
       </mesh>
 
-      <mesh position={[0, -depth - 0.05, 0]}>
-        <cylinderGeometry
-          args={[radius, radius, 0.1, 48]}
+      <CuboidCollider
+        args={[
+          radius * 0.7,
+          0.05,
+          radius * 0.7,
+        ]}
+        position={[0, -depth, 0]}
+        friction={0.8}
+        restitution={0}
+      />
+
+      <mesh
+        position={[0, -depth, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[radius, 48]} />
+
+        <meshStandardMaterial
+          color="#101010"
+          roughness={1}
         />
-
-        <meshStandardMaterial color="#333333" />
       </mesh>
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <torusGeometry
-          args={[radius, 0.018, 8, 48]}
-        />
-
-        <meshStandardMaterial color="#eeeeee" />
-      </mesh>
-    </group>
+    </RigidBody>
   );
 }
 
-export default function CourseGeometryRenderer({ course }) {
+export default function CourseGeometryRenderer({
+  course,
+}) {
+  if (!course) return null;
+
+  const sections = course.sections ?? [];
+  const walls = course.walls ?? [];
+  const surfaces = course.surfaces ?? [];
+
   return (
     <group>
-      {course.sections.map((section) => (
+      {sections.map((section, index) => (
         <CourseSection
-          key={section.id}
+          key={section.id ?? index}
           section={section}
           hole={
-            section.type === "floor" && section.id === "main-floor"
+            section.type === "floor" &&
+            section.id === "main-floor"
               ? course.hole
               : null
           }
+          surfaces={surfaces}
         />
       ))}
 
-      {course.walls.map((wall) => (
+      {walls.map((wall, index) => (
         <CourseWall
-          key={wall.id}
+          key={wall.id ?? index}
           wall={wall}
         />
       ))}
 
-      <GolfCup hole={course.hole} />
+      {course.hole && (
+        <GolfCup hole={course.hole} />
+      )}
     </group>
   );
 }

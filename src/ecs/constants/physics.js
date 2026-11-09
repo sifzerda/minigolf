@@ -29,9 +29,16 @@ export const PHYSICS = {
     },
 
     sand: {
-      resistance: 3.5,
-      friction: 1.2,
-      rollingGrip: 0.95,
+      resistance: 8.0,
+      friction: 1.5,
+      rollingGrip: 0.98,
+    },
+
+    water: {
+      hazard: true,
+      resistance: 0,
+      friction: 0,
+      rollingGrip: 0,
     },
 
     ice: {

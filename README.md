@@ -54,6 +54,7 @@ npm run start
 - [Tailwindcss](https://tailwindcss.com/)
 - [Vite](https://vitejs.dev/)
 - [Three.js](https://threejs.org/)
+- [Polygon Clipping](https://www.npmjs.com/package/polygon-clipping)
 - [React Three Fiber](https://github.com/pmndrs/react-three-fiber)
 - [React Drei](https://github.com/pmndrs/drei)
 - [React Three Postprocessing](https://github.com/pmndrs/react-three-postprocessing)
@@ -96,3 +97,53 @@ This project is incomplete and requires further development. Currently the highs
 - [ ] 
 - [ ]
 - [ ]courses, and add selection of 9, 18, 27, or 36 courses
+
+
+
+
+
+## Terrain Features Examples
+
+### Obstacles: 
+
+      {
+        type: "hill",
+        position: [0, 0],
+        radius: 3,
+        height: 2.5,
+      },
+
+      {
+        type: "valley",
+        position: [2, -8],
+        radius: 6,
+        depth: 1.2,
+      },
+
+      {
+        type: "ridge",
+        start: [-8, -12],
+        end: [-3, 10],
+        width: 2,
+        height: 0.5,
+      },
+
+### Surfaces:
+
+    {
+      id: "water-01",
+      type: "water",
+      position: [0, 0, -5],
+      points: [
+        [-3, -4],
+        [0, -3],
+        [2, -4],
+        [3, -6],
+        [1, -8],
+        [-2, -7],
+      ],
+      depth: 0.65,
+      color: "#1479a8",
+      basinColor: "#52636a",
+      respawnPosition: [0, 0.5, -2],
+    },

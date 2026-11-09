@@ -8,10 +8,13 @@ import {
 
 import { buildTerrain } from "../terrain/TerrainBuilder.js";
 
-export default function TerrainRenderer({ terrain }) {
+export default function TerrainRenderer({
+  terrain,
+  sections = [],
+}) {
   const meshData = useMemo(
-    () => buildTerrain(terrain),
-    [terrain]
+    () => buildTerrain(terrain, sections),
+    [terrain, sections]
   );
 
   useEffect(() => {
@@ -20,23 +23,26 @@ export default function TerrainRenderer({ terrain }) {
     };
   }, [meshData]);
 
+  if (meshData.indices.length === 0) {
+    return null;
+  }
+
   return (
     <RigidBody
       type="fixed"
       colliders={false}
-      friction={0.8}
-      restitution={0.1}
     >
       <TrimeshCollider
         args={[
           meshData.vertices,
           meshData.indices,
         ]}
+        friction={0.8}
+        restitution={0.1}
       />
 
       <mesh
         geometry={meshData.geometry}
-        castShadow
         receiveShadow
       >
         <meshStandardMaterial

@@ -430,7 +430,6 @@ function Pipe({ entity }) {
   );
 }
 
-
 function Bridge({ entity }) {
   const [width, thickness, length] = entity.size ?? [3, 0.25, 6];
   const railHeight = entity.railHeight ?? 0.5;

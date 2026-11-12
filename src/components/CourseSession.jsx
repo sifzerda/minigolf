@@ -10,9 +10,7 @@ export default function CourseSession({
   paused = false,
 }) {
   // Only retrieve/build a course when its index changes.
-  const course = useMemo(() => getCourse(courseIndex), [courseIndex]
-  );
-
+  const course = useMemo(() => getCourse(courseIndex), [courseIndex]);
   // Track which course has completed ECS initialization.
   const [loadedCourse, setLoadedCourse] = useState(null);
 

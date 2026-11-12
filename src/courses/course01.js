@@ -5,7 +5,7 @@ import { createCourseShape } from "./courseBuilder";
 const course01 = {
   id: "course-01",
   number: 1,
-  name: "The Little Hill",
+  name: "Small Hill",
   environment: "garden",
   par: 2,
 

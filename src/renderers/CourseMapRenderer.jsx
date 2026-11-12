@@ -205,8 +205,8 @@ function getBounds(course) {
         obstacle.size[0],
         obstacle.size[2],
         obstacle.angle ??
-          obstacle.rotation?.[1] ??
-          0
+        obstacle.rotation?.[1] ??
+        0
       );
     }
 
@@ -299,14 +299,28 @@ function MapSurface({ surface, project, scale }) {
   const stroke =
     type === "water" ? "#7bd8f5" : "#ffffff";
 
+
   if (
     Array.isArray(surface.points) &&
     surface.points.filter(isPoint2).length >= 3
   ) {
+    const rings = [
+      surface.points,
+      ...(surface.holes ?? []).map((hole) =>
+        Array.isArray(hole) ? hole : hole.points
+      ),
+    ];
+
+    const path = rings
+      .map((ring) => ringToPath(ring, project))
+      .filter(Boolean)
+      .join(" ");
+
     return (
-      <polygon
-        points={polygonPoints(surface.points, project)}
+      <path
+        d={path}
         fill={color}
+        fillRule="evenodd"
         stroke={stroke}
         strokeWidth={type === "water" ? 1.8 : 1}
         strokeLinejoin="round"
@@ -314,6 +328,7 @@ function MapSurface({ surface, project, scale }) {
       />
     );
   }
+
 
   if (
     !isPoint3(surface.position) ||
@@ -469,9 +484,8 @@ function RotatedRectangle({
       fill={color}
       stroke={stroke}
       strokeWidth="1.5"
-      transform={`translate(${cx} ${cy}) rotate(${
-        -(angle * 180) / Math.PI
-      })`}
+      transform={`translate(${cx} ${cy}) rotate(${-(angle * 180) / Math.PI
+        })`}
     />
   );
 }
@@ -512,9 +526,9 @@ function MapObstacle({
           type === "cliff"
             ? 5
             : Math.max(
-                2,
-                (obstacle.width ?? 2) * scale
-              )
+              2,
+              (obstacle.width ?? 2) * scale
+            )
         }
         strokeDasharray={
           type === "cliff" ? "8 4" : undefined
@@ -573,6 +587,87 @@ function MapObstacle({
     position[0],
     position[2]
   );
+
+  if (type === "bridge") {
+    if (
+      !Array.isArray(size) ||
+      !Number.isFinite(size[0]) ||
+      !Number.isFinite(size[2])
+    ) {
+      return null;
+    }
+
+    const width = size[0] * scale;
+    const length = size[2] * scale;
+
+    const plankCount = Math.max(
+      1,
+      Math.floor(size[2] / 0.35)
+    );
+
+    const angle =
+      obstacle.angle ??
+      obstacle.rotation?.[1] ??
+      0;
+
+    return (
+      <g
+        transform={`translate(${cx} ${cy}) rotate(${-(angle * 180) / Math.PI
+          })`}
+      >
+        {/* Bridge deck */}
+        <rect
+          x={-width / 2}
+          y={-length / 2}
+          width={width}
+          height={length}
+          rx="1"
+          fill={obstacle.color ?? "#a87945"}
+          stroke="#654526"
+          strokeWidth="1.2"
+        />
+
+        {/* Wooden planks */}
+        {Array.from({ length: plankCount }, (_, index) => {
+          const y =
+            -length / 2 +
+            ((index + 1) * length) / (plankCount + 1);
+
+          return (
+            <line
+              key={index}
+              x1={-width / 2}
+              y1={y}
+              x2={width / 2}
+              y2={y}
+              stroke="#654526"
+              strokeWidth="0.8"
+              opacity="0.65"
+            />
+          );
+        })}
+
+        {/* Side edges */}
+        <line
+          x1={-width / 2}
+          y1={-length / 2}
+          x2={-width / 2}
+          y2={length / 2}
+          stroke="#d5a76e"
+          strokeWidth="1"
+        />
+
+        <line
+          x1={width / 2}
+          y1={-length / 2}
+          x2={width / 2}
+          y2={length / 2}
+          stroke="#d5a76e"
+          strokeWidth="1"
+        />
+      </g>
+    );
+  }
 
   if (type === "bumper") {
     return (
@@ -660,9 +755,8 @@ function MapObstacle({
 
     return (
       <g
-        transform={`translate(${cx} ${cy}) rotate(${
-          -(angle * 180) / Math.PI
-        })`}
+        transform={`translate(${cx} ${cy}) rotate(${-(angle * 180) / Math.PI
+          })`}
       >
         <rect
           x={-length / 2}

@@ -34,98 +34,107 @@ const CIRCLE_SEGMENTS = 64;
 // Polygon helpers
 // --------------------------------------------------
 
+// Coordinate normalization reduces almost-identical edges before clipping.
+const CLIP_PRECISION = 1e5;
+const MIN_AREA = 1e-7;
+
 function closeRing(points) {
-  if (!Array.isArray(points) || points.length < 3) {
-    return [];
+  if (!Array.isArray(points)) return [];
+  const ring = [];
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length < 2) continue;
+    const x = Number(point[0]);
+    const z = Number(point[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+    const next = [
+      Math.round(x * CLIP_PRECISION) / CLIP_PRECISION,
+      Math.round(z * CLIP_PRECISION) / CLIP_PRECISION,
+    ];
+    const last = ring.at(-1);
+    if (!last || last[0] !== next[0] || last[1] !== next[1]) ring.push(next);
   }
-
-  const ring = points.map(([x, z]) => [x, z]);
-  const first = ring[0];
-  const last = ring.at(-1);
-
-  if (
-    Math.abs(first[0] - last[0]) > EPSILON || Math.abs(first[1] - last[1]) > EPSILON
-  ) {
-    ring.push([...first]);
+  if (ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
+  if (ring.length < 3) return [];
+  let twiceArea = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    twiceArea += a[0] * b[1] - b[0] * a[1];
   }
+  if (Math.abs(twiceArea) < 2 * MIN_AREA) return [];
+  return [...ring, [...ring[0]]];
+}
 
-  return ring;
+function normalizePolygons(section) {
+  if (Array.isArray(section.polygons)) {
+    return section.polygons.map((polygon) => {
+      if (!Array.isArray(polygon)) return [];
+      const rings = polygon.map(closeRing);
+      return rings[0]?.length >= 4 ? [rings[0], ...rings.slice(1).filter(r => r.length >= 4)] : [];
+    }).filter(p => p.length);
+  }
+  const ring = closeRing(section.points);
+  return ring.length ? [[ring]] : [];
 }
 
 function makeCircleRing(x, z, radius) {
-  return closeRing(
-    Array.from(
-      { length: CIRCLE_SEGMENTS }, (_, i) => {
-        const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-
-        return [
-          x + Math.cos(angle) * radius,
-          z + Math.sin(angle) * radius,
-        ];
-      }
-    )
-  );
+  return closeRing(Array.from({ length: CIRCLE_SEGMENTS }, (_, i) => {
+    const angle = i * 2 * Math.PI / CIRCLE_SEGMENTS;
+    return [x + Math.cos(angle) * radius, z + Math.sin(angle) * radius];
+  }));
 }
 
-function makeWaterRing(surface) {
-  if (
-    Array.isArray(surface.points) && surface.points.length >= 3
-  ) {
-    return closeRing(surface.points);
-  }
-
-  if (!surface.position || !surface.size) {
-    return [];
-  }
-
-  const [x, , z] = surface.position;
-  const [width, length] = surface.size;
-
-  const hw = width / 2;
-  const hl = length / 2;
-
-  return closeRing([
-    [x - hw, z - hl],
-    [x + hw, z - hl],
-    [x + hw, z + hl],
-    [x - hw, z + hl],
-  ]);
-}
-
-function getWaterSurfaces(surfaces) {
-  return surfaces.filter((surface) => (surface.surface ?? surface.type) === "water");
-}
-
-function subtractFloorRegions(
-  section,
-  hole,
-  surfaces
-) {
-  const floor = section.polygons ?? (section.points?.length >= 3 ? [[closeRing(section.points)]] : []);
-
-  if (!floor.length) return [];
-
-  const cutouts = [];
-
-  if (hole) {
-    const [x, , z] = hole.position;
-
-    cutouts.push([
-      [makeCircleRing(x, z, hole.radius)],
+function makeWaterPolygon(surface, includeHoles = true) {
+  let outer;
+  if (surface.points?.length >= 3) {
+    outer = closeRing(surface.points);
+  } else if (surface.position && surface.size) {
+    const [x, , z] = surface.position;
+    const [width, length] = surface.size;
+    outer = closeRing([
+      [x - width / 2, z - length / 2],
+      [x + width / 2, z - length / 2],
+      [x + width / 2, z + length / 2],
+      [x - width / 2, z + length / 2],
     ]);
   }
+  if (!outer?.length) return null;
+  const holes = (includeHoles ? (surface.holes ?? []) : []).map(h => closeRing(Array.isArray(h) ? h : h?.points))
+    .filter(r => r.length >= 4);
+  return [[outer, ...holes]];
+}
 
-  for (const water of getWaterSurfaces(surfaces)) {
-    const ring = makeWaterRing(water);
+function subtractFloorRegions(section, hole, surfaces = []) {
+  const floor = normalizePolygons(section);
+  if (!floor.length) return [];
+  const cutouts = [];
 
-    if (ring.length >= 4) {
-      cutouts.push([[ring]]);
+  if (hole?.position && hole.radius > 0) {
+    const [x, , z] = hole.position;
+    const ring = makeCircleRing(x, z, hole.radius);
+    if (ring.length) cutouts.push([[ring]]);
+  }
+
+  // Island floors are independent land; the lake surrounds, but does not erase, them.
+  if (section.excludeWater !== true) {
+    for (const surface of surfaces) {
+      if ((surface.surface ?? surface.type) !== "water") continue;
+      // Remove the full lake footprint from the outer floor.
+      // The island is a separate section with excludeWater: true.
+      const water = makeWaterPolygon(surface, false);
+      if (water) cutouts.push(water);
     }
   }
 
   if (!cutouts.length) return floor;
-
-  return polygonClipping.difference(floor, ...cutouts);
+  try {
+    return polygonClipping.difference(floor, ...cutouts);
+  } catch (error) {
+    console.error(`Invalid floor clipping geometry in section ${section.id ?? "unnamed"}`, {
+      floor, cutouts, error,
+    });
+    // Never return the uncut floor: it would create an invisible floor across the lake.
+    throw error;
+  }
 }
 
 // --------------------------------------------------
@@ -1342,7 +1351,7 @@ export default function CourseGeometryRenderer({
           section={section}
           hole={
             section.type === "floor" &&
-              section.id === "main-floor"
+              section.excludeWater !== true
               ? course.hole
               : null
           }

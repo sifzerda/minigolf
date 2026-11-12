@@ -4,51 +4,130 @@ import * as THREE from "three";
 import polygonClipping from "polygon-clipping";
 
 const EPS = 1e-5;
+const PRECISION = 1e5;
 
 function closeRing(points) {
-  const result = points.map(([x, z]) => [x, z]);
+  if (!Array.isArray(points)) return [];
 
-  if (result.length < 3) return [];
+  const ring = [];
 
-  const first = result[0];
-  const last = result[result.length - 1];
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length < 2) {
+      continue;
+    }
 
-  if (
-    Math.abs(first[0] - last[0]) > EPS ||
-    Math.abs(first[1] - last[1]) > EPS
-  ) {
-    result.push([...first]);
+    const x = Number(point[0]);
+    const z = Number(point[1]);
+
+    if (!Number.isFinite(x) || !Number.isFinite(z)) {
+      continue;
+    }
+
+    const p = [
+      Math.round(x * PRECISION) / PRECISION,
+      Math.round(z * PRECISION) / PRECISION,
+    ];
+
+    const last = ring.at(-1);
+
+    if (
+      !last ||
+      last[0] !== p[0] ||
+      last[1] !== p[1]
+    ) {
+      ring.push(p);
+    }
   }
 
-  return result;
+  if (
+    ring.length > 1 &&
+    ring[0][0] === ring.at(-1)[0] &&
+    ring[0][1] === ring.at(-1)[1]
+  ) {
+    ring.pop();
+  }
+
+  if (ring.length < 3) return [];
+
+  let area = 0;
+
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+
+  if (Math.abs(area) < EPS * EPS) {
+    return [];
+  }
+
+  return [...ring, [...ring[0]]];
 }
 
 function waterPolygon(surface) {
+  let outer;
+
   if (surface.points?.length >= 3) {
-    return [[closeRing(surface.points)]];
+    outer = closeRing(surface.points);
+  } else if (surface.position && surface.size) {
+    const [x, , z] = surface.position;
+    const [width, length] = surface.size;
+
+    outer = closeRing([
+      [x - width / 2, z - length / 2],
+      [x + width / 2, z - length / 2],
+      [x + width / 2, z + length / 2],
+      [x - width / 2, z + length / 2],
+    ]);
   }
 
-  const [x, , z] = surface.position;
-  const [width, length] = surface.size;
+  if (!outer?.length) return [];
 
-  return [[closeRing([
-    [x - width / 2, z - length / 2],
-    [x + width / 2, z - length / 2],
-    [x + width / 2, z + length / 2],
-    [x - width / 2, z + length / 2],
-  ])]];
+  const holes = (surface.holes ?? [])
+    .map((hole) =>
+      closeRing(
+        Array.isArray(hole)
+          ? hole
+          : hole?.points
+      )
+    )
+    .filter((ring) => ring.length >= 4);
+
+  return [[outer, ...holes]];
 }
 
-function floorPolygons(sections) {
-  return sections
-    .filter(
-      (section) =>
-        section.type === "floor" &&
-        section.points?.length >= 3
-    )
-    .map((section) => [
-      [closeRing(section.points)],
-    ]);
+function floorPolygons(sections = []) {
+  const result = [];
+
+  for (const section of sections) {
+    if (section.type !== "floor") continue;
+
+    if (Array.isArray(section.polygons)) {
+      for (const polygon of section.polygons) {
+        if (!Array.isArray(polygon)) continue;
+
+        const rings = polygon.map(closeRing);
+
+        if (rings[0]?.length >= 4) {
+          result.push([
+            rings[0],
+            ...rings
+              .slice(1)
+              .filter((ring) => ring.length >= 4),
+          ]);
+        }
+      }
+    } else {
+      const ring = closeRing(section.points);
+
+      if (ring.length >= 4) {
+        result.push([ring]);
+      }
+    }
+  }
+
+  return result;
 }
 
 function createHorizontalGeometry(polygons, y) {
@@ -57,12 +136,16 @@ function createHorizontalGeometry(polygons, y) {
 
   for (const polygon of polygons) {
     const toVectors = (ring) =>
-      ring.slice(0, -1).map(
-        ([x, z]) => new THREE.Vector2(x, z)
-      );
+      ring
+        .slice(0, -1)
+        .map(
+          ([x, z]) => new THREE.Vector2(x, z)
+        );
 
     const outer = toVectors(polygon[0]);
-    const holes = polygon.slice(1).map(toVectors);
+    const holes = polygon
+      .slice(1)
+      .map(toVectors);
 
     const triangles =
       THREE.ShapeUtils.triangulateShape(
@@ -70,15 +153,22 @@ function createHorizontalGeometry(polygons, y) {
         holes
       );
 
-    const points = [...outer, ...holes.flat()];
+    const points = [
+      ...outer,
+      ...holes.flat(),
+    ];
+
     const offset = positions.length / 3;
 
     for (const point of points) {
-      positions.push(point.x, y, point.y);
+      positions.push(
+        point.x,
+        y,
+        point.y
+      );
     }
 
     for (const [a, b, c] of triangles) {
-      // Upward-facing XZ triangles.
       const p0 = points[a];
       const p1 = points[b];
       const p2 = points[c];
@@ -107,7 +197,10 @@ function createHorizontalGeometry(polygons, y) {
 
   geometry.setAttribute(
     "position",
-    new THREE.Float32BufferAttribute(positions, 3)
+    new THREE.Float32BufferAttribute(
+      positions,
+      3
+    )
   );
 
   geometry.setIndex(indices);
@@ -124,7 +217,9 @@ function isOnSegment(point, a, b) {
     (point[0] - a[0]) * dz -
     (point[1] - a[1]) * dx;
 
-  if (Math.abs(cross) > EPS) return false;
+  if (Math.abs(cross) > EPS) {
+    return false;
+  }
 
   const dot =
     (point[0] - a[0]) * dx +
@@ -137,25 +232,15 @@ function isOnSegment(point, a, b) {
 }
 
 function isBoundaryEdge(a, b, sections) {
-  for (const section of sections) {
-    if (
-      section.type !== "floor" ||
-      !section.points
-    ) {
-      continue;
-    }
-
-    const ring = closeRing(section.points);
-
-    for (let i = 0; i < ring.length - 1; i++) {
-      const p = ring[i];
-      const q = ring[i + 1];
-
-      if (
-        isOnSegment(a, p, q) &&
-        isOnSegment(b, p, q)
-      ) {
-        return true;
+  for (const polygon of floorPolygons(sections)) {
+    for (const ring of polygon) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        if (
+          isOnSegment(a, ring[i], ring[i + 1]) &&
+          isOnSegment(b, ring[i], ring[i + 1])
+        ) {
+          return true;
+        }
       }
     }
   }
@@ -178,7 +263,7 @@ function createWallGeometry(
         const a = ring[i];
         const b = ring[i + 1];
 
-        // Open water at the course perimeter.
+        // Leave water open at the course perimeter.
         if (isBoundaryEdge(a, b, sections)) {
           continue;
         }
@@ -208,7 +293,10 @@ function createWallGeometry(
 
   geometry.setAttribute(
     "position",
-    new THREE.Float32BufferAttribute(positions, 3)
+    new THREE.Float32BufferAttribute(
+      positions,
+      3
+    )
   );
 
   geometry.setIndex(indices);
@@ -219,24 +307,13 @@ function createWallGeometry(
 
 export function buildWaterBasin(
   surface,
-  sections
+  sections = []
 ) {
+  const water = waterPolygon(surface);
   const floors = floorPolygons(sections);
 
-  const water = waterPolygon(surface);
-
-  const playable = floors.length
-    ? polygonClipping.union(...floors)
-    : [];
-
-  const clipped = playable.length
-    ? polygonClipping.intersection(
-        water,
-        playable
-      )
-    : [];
-
   const floorY = surface.position?.[1] ?? 0;
+
   const depth = Math.max(
     0.3,
     surface.depth ?? 0.65
@@ -245,27 +322,61 @@ export function buildWaterBasin(
   const bottomY = floorY - depth;
   const waterY = floorY - depth * 0.35;
 
+  let clipped = [];
+
+  if (water.length && floors.length) {
+    try {
+      // The outer floor should be defined before
+      // water subtraction.
+      //
+      // Water holes preserve islands.
+      const playable =
+        polygonClipping.union(...floors);
+
+      clipped = polygonClipping.intersection(
+        water,
+        playable
+      );
+    } catch (error) {
+      console.error(
+        `Water basin clipping failed: ${
+          surface.id ?? "unnamed"
+        }`,
+        {
+          water,
+          floors,
+          error,
+        }
+      );
+
+      throw error;
+    }
+  }
+
   return {
     polygons: clipped,
     bottomY,
     waterY,
     floorY,
 
-    bottomGeometry: createHorizontalGeometry(
-      clipped,
-      bottomY
-    ),
+    bottomGeometry:
+      createHorizontalGeometry(
+        clipped,
+        bottomY
+      ),
 
-    waterGeometry: createHorizontalGeometry(
-      clipped,
-      waterY
-    ),
+    waterGeometry:
+      createHorizontalGeometry(
+        clipped,
+        waterY
+      ),
 
-    wallGeometry: createWallGeometry(
-      clipped,
-      sections,
-      floorY,
-      bottomY
-    ),
+    wallGeometry:
+      createWallGeometry(
+        clipped,
+        sections,
+        floorY,
+        bottomY
+      ),
   };
 }

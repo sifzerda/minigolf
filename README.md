@@ -147,3 +147,9 @@ This project is incomplete and requires further development. Currently the highs
       basinColor: "#52636a",
       respawnPosition: [0, 0.5, -2],
     },
+
+
+
+
+    - Once all maps are finished, use screenshots of courses 
+    rather than using coursemap renderer

@@ -1,23 +1,11 @@
 // src/courses/course02.js
 
-import {
-  createPolygonFloor,
-  createPolygonWalls,
-} from "./courseBuilder";
-
-const points = [
-  [-4, 10],
-  [4, 10],
-  [4, 2],
-  [2, 2],
-  [2, -10],
-  [-4, -10],
-];
+import { createCourseShape } from "./courseBuilder";
 
 const course02 = {
   id: "course-02",
   number: 2,
-  name: "The Bend",
+  name: "The Sandy Fork",
   environment: "desert",
   par: 3,
 
@@ -28,28 +16,65 @@ const course02 = {
     radius: 0.43,
   },
 
-  sections: [
-    createPolygonFloor({
-      id: "main-floor",
-      points,
-      color: "#267b49",
-    }),
-  ],
+  ...createCourseShape({
+    type: "rounded",
 
-  walls: createPolygonWalls({ points }),
+    points: [
+      [-4, 10],
+      [4, 10],
+      [5, 9],
+      [5, -9],
+      [4, -10],
+      [-4, -10],
+      [-5, -9],
+      [-5, 9],
+    ],
+
+    samples: 6,
+
+    holes: [
+      {
+        type: "polygon",
+        points: [
+          [-0.4, 3],
+          [1.2, 2.5],
+          [1.8, 1],
+          [1.8, -2],
+          [1.2, -3.5],
+          [-0.4, -4],
+          [-1.1, -2],
+          [-1.1, 1],
+        ],
+      },
+    ],
+
+    color: "#398f53",
+
+    wall: {
+      color: "#806d55",
+    },
+  }),
 
   surfaces: [
     {
       surface: "sand",
-      position: [-1.0, 0, -3], // x, y, z
-      size: [6, 3], // width, height
+      position: [-3, 0, -0.5],
+      size: [3.4, 7],
       color: "#d8bc7a",
     },
   ],
 
   ramps: [],
-
   obstacles: [],
+
+  terrain: {
+    width: 30,
+    length: 40,
+    resolution: 64,
+    baseHeight: -0.15,
+    defaultSurface: "sand",
+    features: [],
+  },
 };
 
 export default course02;

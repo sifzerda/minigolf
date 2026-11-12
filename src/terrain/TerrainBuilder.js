@@ -4,6 +4,12 @@ import * as THREE from "three";
 import polygonClipping from "polygon-clipping";
 
 import {
+  triangulateXZ,
+  subdivideXZ,
+  upwardTriangleIndices,
+} from "./PolygonMesh";
+
+import {
   getTerrainHeight,
   prepareTerrainFeatures,
 } from "./TerrainFeatures";
@@ -11,130 +17,63 @@ import {
 import { getTerrainSurface } from "./TerrainRegions";
 import { getTerrainMaterial } from "./TerrainMaterials";
 
-function closeRing(points) {
-  if (points.length < 3) return [];
+const closeRing = (points) => {
+  const result = points.map(([x, z]) => [x, z]);
 
-  const ring = points.map(([x, z]) => [x, z]);
-
-  const first = ring[0];
-  const last = ring[ring.length - 1];
-
-  if (first[0] !== last[0] || first[1] !== last[1]) {
-    ring.push([...first]);
+  if (
+    result.length >= 3 &&
+    (
+      result[0][0] !== result.at(-1)[0] ||
+      result[0][1] !== result.at(-1)[1]
+    )
+  ) {
+    result.push([...result[0]]);
   }
 
-  return ring;
-}
+  return result;
+};
 
 function getExteriorPolygons(width, length, sections) {
-  const halfWidth = width / 2;
-  const halfLength = length / 2;
+  const hw = width / 2;
+  const hl = length / 2;
 
-  const boundary = [[closeRing([
-    [-halfWidth, -halfLength],
-    [halfWidth, -halfLength],
-    [halfWidth, halfLength],
-    [-halfWidth, halfLength],
-  ])]];
+  const boundary = [
+    [
+      closeRing([
+        [-hw, -hl],
+        [hw, -hl],
+        [hw, hl],
+        [-hw, hl],
+      ]),
+    ],
+  ];
 
   const exclusions = sections
-    .filter(
-      (section) =>
-        section.type === "floor" &&
-        Array.isArray(section.points) &&
-        section.points.length >= 3
-    )
-    .map((section) => [
-      [closeRing(section.points)],
-    ]);
+    .filter((section) => section.type === "floor")
+    .flatMap((section) =>
+      section.polygons?.length
+        ? section.polygons
+        : section.points?.length >= 3
+          ? [[closeRing(section.points)]]
+          : []
+    );
 
-  if (exclusions.length === 0) {
-    return boundary;
-  }
+  if (!exclusions.length) return boundary;
 
   return polygonClipping.difference(
     boundary,
-    ...exclusions
+    exclusions
   );
 }
 
-function triangulatePolygon(polygon) {
-  const toVectors = (ring) =>
-    ring.slice(0, -1).map(
-      ([x, z]) => new THREE.Vector2(x, z)
-    );
-
-  const contour = toVectors(polygon[0]);
-  const holes = polygon.slice(1).map(toVectors);
-
-  if (contour.length < 3) return [];
-
-  const triangles = THREE.ShapeUtils.triangulateShape(
-    contour,
-    holes
-  );
-
-  const points = [
-    ...contour,
-    ...holes.flat(),
-  ];
-
-  return triangles.map(([a, b, c]) => [
-    points[a],
-    points[b],
-    points[c],
-  ]);
-}
-
-function subdivideTriangle(a, b, c, maxEdge, emit) {
-  const stack = [[a, b, c]];
-  const maxEdgeSquared = maxEdge * maxEdge;
-
-  while (stack.length > 0) {
-    const [p0, p1, p2] = stack.pop();
-
-    const edges = [
-      [p0, p1, p2],
-      [p1, p2, p0],
-      [p2, p0, p1],
-    ];
-
-    let longest = edges[0];
-    let longestLength = -1;
-
-    for (const edge of edges) {
-      const dx = edge[0].x - edge[1].x;
-      const dz = edge[0].y - edge[1].y;
-      const length = dx * dx + dz * dz;
-
-      if (length > longestLength) {
-        longestLength = length;
-        longest = edge;
-      }
-    }
-
-    if (longestLength <= maxEdgeSquared) {
-      emit(p0, p1, p2);
-      continue;
-    }
-
-    const [start, end, opposite] = longest;
-
-    const midpoint = new THREE.Vector2(
-      (start.x + end.x) / 2,
-      (start.y + end.y) / 2
-    );
-
-    stack.push(
-      [start, midpoint, opposite],
-      [midpoint, end, opposite]
-    );
-  }
-}
-
-export function buildTerrain(terrain, floorSections = []) {
+export function buildTerrain(
+  terrain,
+  floorSections = []
+) {
   if (!terrain) {
-    throw new Error("Terrain configuration is required");
+    throw new Error(
+      "Terrain configuration is required"
+    );
   }
 
   const {
@@ -144,19 +83,20 @@ export function buildTerrain(terrain, floorSections = []) {
   } = terrain;
 
   if (
-    !Number.isFinite(width) ||
-    !Number.isFinite(length) ||
-    !Number.isFinite(resolution) ||
+    ![width, length, resolution].every(
+      Number.isFinite
+    ) ||
     width <= 0 ||
     length <= 0 ||
     resolution < 2
   ) {
-    throw new Error("Invalid terrain dimensions");
+    throw new Error(
+      "Invalid terrain dimensions"
+    );
   }
 
-  const segments = Math.max(2, Math.floor(resolution));
-
-  const preparedFeatures = prepareTerrainFeatures(terrain);
+  const preparedFeatures =
+    prepareTerrainFeatures(terrain);
 
   const polygons = getExteriorPolygons(
     width,
@@ -165,8 +105,8 @@ export function buildTerrain(terrain, floorSections = []) {
   );
 
   const maxEdge = Math.max(
-    width / segments,
-    length / segments
+    width / Math.floor(resolution),
+    length / Math.floor(resolution)
   );
 
   const vertices = [];
@@ -174,18 +114,17 @@ export function buildTerrain(terrain, floorSections = []) {
   const uvs = [];
   const colors = [];
 
-  // Reuse vertices so normals can be averaged
-  // across neighbouring triangles.
-  const vertexLookup = new Map();
+  const lookup = new Map();
 
   function addVertex(point) {
     const x = point.x;
     const z = point.y;
 
-    const key = `${x.toFixed(7)},${z.toFixed(7)}`;
+    const key =
+      `${x.toFixed(7)},${z.toFixed(7)}`;
 
-    if (vertexLookup.has(key)) {
-      return vertexLookup.get(key);
+    if (lookup.has(key)) {
+      return lookup.get(key);
     }
 
     const y = getTerrainHeight(
@@ -210,18 +149,19 @@ export function buildTerrain(terrain, floorSections = []) {
       z / length + 0.5
     );
 
-    const surface = getTerrainSurface(
-      x,
-      z,
-      terrain
+    const color = new THREE.Color(
+      getTerrainMaterial(
+        getTerrainSurface(x, z, terrain)
+      ).color
     );
 
-    const material = getTerrainMaterial(surface);
-    const color = new THREE.Color(material.color);
+    colors.push(
+      color.r,
+      color.g,
+      color.b
+    );
 
-    colors.push(color.r, color.g, color.b);
-
-    vertexLookup.set(key, index);
+    lookup.set(key, index);
 
     return index;
   }
@@ -237,20 +177,20 @@ export function buildTerrain(terrain, floorSections = []) {
     const ib = addVertex(b);
     const ic = addVertex(c);
 
-    // XZ triangles need clockwise winding when
-    // viewed from above to produce upward normals.
-    if (area < 0) {
-      indices.push(ia, ib, ic);
-    } else {
-      indices.push(ia, ic, ib);
-    }
+    upwardTriangleIndices(
+      a,
+      b,
+      c,
+      ia,
+      ib,
+      ic,
+      indices
+    );
   }
 
   for (const polygon of polygons) {
-    const triangles = triangulatePolygon(polygon);
-
-    for (const [a, b, c] of triangles) {
-      subdivideTriangle(
+    for (const [a, b, c] of triangulateXZ(polygon)) {
+      subdivideXZ(
         a,
         b,
         c,

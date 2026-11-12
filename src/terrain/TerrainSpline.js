@@ -3,121 +3,114 @@
 import * as THREE from "three";
 
 const clamp = (value, min, max) =>
-  Math.max(min, Math.min(max, value));
+    Math.max(min, Math.min(max, value));
 
-export const smoothstep = (value) => {
-  const t = clamp(value, 0, 1);
-  return t * t * (3 - 2 * t);
-};
+export function smoothstep(value) {
+    const t = clamp(value, 0, 1);
+    return t * t * (3 - 2 * t);
+}
 
 export function createTerrainSpline(feature) {
-  const points = feature.points;
+    const points = feature.points;
 
-  if (
-    !Array.isArray(points) ||
-    points.length < 2 ||
-    points.some(
-      (point) =>
-        !Array.isArray(point) ||
-        point.length < 2 ||
-        !Number.isFinite(point[0]) ||
-        !Number.isFinite(point[1])
-    )
-  ) {
-    throw new Error(
-      "Terrain spline requires at least two valid [x, z] points"
+    if (
+        !Array.isArray(points) ||
+        points.length < 2 ||
+        points.some(
+            (p) =>
+                !Array.isArray(p) ||
+                !Number.isFinite(p[0]) ||
+                !Number.isFinite(p[1])
+        )
+    ) {
+        throw new Error(
+            "Terrain spline requires two valid [x,z] points"
+        );
+    }
+
+    const curve = new THREE.CatmullRomCurve3(
+        points.map(
+            ([x, z]) => new THREE.Vector3(x, 0, z)
+        ),
+        false,
+        "centripetal"
     );
-  }
 
-  const controlPoints = points.map(
-    ([x, z]) => new THREE.Vector3(x, 0, z)
-  );
-
-  const curve = new THREE.CatmullRomCurve3(
-    controlPoints,
-    false,
-    "centripetal"
-  );
-
-  const sampleCount = Math.max(
-    32,
-    Math.floor(feature.samples ?? points.length * 32)
-  );
-
-  const samples = curve.getPoints(sampleCount);
-
-  return {
-    samples,
-    width: Math.max(0.01, feature.width ?? 3),
-    edgeWidth: Math.max(0.001, feature.edgeWidth ?? 1),
-    height: feature.height ?? 2,
-    startHeight: feature.startHeight,
-    endHeight: feature.endHeight,
-  };
+    return {
+        samples: curve.getPoints(
+            Math.max(
+                32,
+                Math.floor(
+                    feature.samples ?? points.length * 32
+                )
+            )
+        ),
+        width: Math.max(0.01, feature.width ?? 3),
+        edgeWidth: Math.max(
+            0.001,
+            feature.edgeWidth ?? 1
+        ),
+        height: feature.height ?? 2,
+        startHeight: feature.startHeight,
+        endHeight: feature.endHeight,
+    };
 }
 
 export function sampleTerrainSpline(x, z, spline) {
-  let closestDistanceSquared = Infinity;
-  let closestProgress = 0;
+    let best = Infinity;
+    let progress = 0;
 
-  const points = spline.samples;
-  const segmentCount = points.length - 1;
+    const points = spline.samples;
+    const count = points.length - 1;
 
-  for (let i = 0; i < segmentCount; i++) {
-    const a = points[i];
-    const b = points[i + 1];
+    for (let i = 0; i < count; i++) {
+        const a = points[i];
+        const b = points[i + 1];
 
-    const dx = b.x - a.x;
-    const dz = b.z - a.z;
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const lengthSquared = dx * dx + dz * dz;
 
-    const lengthSquared = dx * dx + dz * dz;
+        const t = lengthSquared
+            ? clamp(
+                (
+                    (x - a.x) * dx +
+                    (z - a.z) * dz
+                ) / lengthSquared,
+                0,
+                1
+            )
+            : 0;
 
-    const t =
-      lengthSquared > 0
-        ? clamp(
-            ((x - a.x) * dx + (z - a.z) * dz) /
-              lengthSquared,
-            0,
-            1
-          )
-        : 0;
+        const px = a.x + dx * t;
+        const pz = a.z + dz * t;
 
-    const px = a.x + dx * t;
-    const pz = a.z + dz * t;
+        const distanceSquared =
+            (x - px) ** 2 +
+            (z - pz) ** 2;
 
-    const distanceSquared =
-      (x - px) ** 2 + (z - pz) ** 2;
-
-    if (distanceSquared < closestDistanceSquared) {
-      closestDistanceSquared = distanceSquared;
-      closestProgress = (i + t) / segmentCount;
+        if (distanceSquared < best) {
+            best = distanceSquared;
+            progress = (i + t) / count;
+        }
     }
-  }
 
-  const distance = Math.sqrt(closestDistanceSquared);
+    const distance = Math.sqrt(best);
 
-  const halfWidth = spline.width / 2;
-
-  const influence =
-    1 -
-    smoothstep(
-      (distance - halfWidth) / spline.edgeWidth
-    );
-
-  const startHeight =
-    spline.startHeight ?? spline.height;
-
-  const endHeight =
-    spline.endHeight ?? spline.height;
-
-  const height =
-    startHeight +
-    (endHeight - startHeight) * closestProgress;
-
-  return {
-    distance,
-    progress: closestProgress,
-    influence,
-    height,
-  };
+    return {
+        distance,
+        progress,
+        influence:
+            1 -
+            smoothstep(
+                (distance - spline.width / 2) /
+                spline.edgeWidth
+            ),
+        height:
+            (spline.startHeight ?? spline.height) +
+            (
+                (spline.endHeight ?? spline.height) -
+                (spline.startHeight ?? spline.height)
+            ) * progress,
+    };
 }

@@ -7,19 +7,9 @@ export function createFairwaySampler(fairway) {
     return null;
   }
 
-  const points = fairway.points.map(
-    ([x, z]) => new THREE.Vector3(x, 0, z)
-  );
-
-  const curve = new THREE.CatmullRomCurve3(
-    points,
-    false,
-    "centripetal"
-  );
-
-  const samples = curve.getPoints(
-    Math.max(32, points.length * 24)
-  );
+  const points = fairway.points.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
+  const samples = curve.getPoints(Math.max(32, points.length * 24));
 
   return {
     points: samples,
@@ -42,38 +32,19 @@ export function getFairwayInfluence(x, z, sampler) {
     const dz = b.z - a.z;
     const lengthSquared = dx * dx + dz * dz;
 
-    const t = lengthSquared > 0
-      ? Math.max(
-          0,
-          Math.min(
-            1,
-            ((x - a.x) * dx + (z - a.z) * dz) /
-              lengthSquared
-          )
-        )
-      : 0;
+    const t = lengthSquared > 0 ? Math.max(0,  Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lengthSquared)) : 0;
 
     const px = a.x + dx * t;
     const pz = a.z + dz * t;
 
-    nearest = Math.min(
-      nearest,
-      Math.hypot(x - px, z - pz)
-    );
+    nearest = Math.min(nearest, Math.hypot(x - px, z - pz));
   }
 
   const halfWidth = sampler.width / 2;
 
   if (nearest <= halfWidth) return 1;
 
-  const t = Math.max(
-    0,
-    Math.min(
-      1,
-      (nearest - halfWidth) /
-        Math.max(0.001, sampler.shoulder)
-    )
-  );
+  const t = Math.max(0, Math.min(1, (nearest - halfWidth) / Math.max(0.001, sampler.shoulder)));
 
   return 1 - t * t * (3 - 2 * t);
 }

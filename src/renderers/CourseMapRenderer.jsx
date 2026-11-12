@@ -28,11 +28,207 @@ const isPoint3 = (point) =>
   Number.isFinite(point[0]) &&
   Number.isFinite(point[2]);
 
+function getFloorPolygons(section) {
+  if (section.type !== "floor") return [];
+
+  // MultiPolygon -> Polygon -> Ring -> [x, z]
+  if (Array.isArray(section.polygons)) {
+    return section.polygons.filter(
+      (polygon) =>
+        Array.isArray(polygon) &&
+        polygon.some(
+          (ring) =>
+            Array.isArray(ring) &&
+            ring.filter(isPoint2).length >= 3
+        )
+    );
+  }
+
+  // Legacy floor format.
+  if (
+    Array.isArray(section.points) &&
+    section.points.filter(isPoint2).length >= 3
+  ) {
+    return [[section.points]];
+  }
+
+  return [];
+}
+
+function polygonPoints(points, project) {
+  return (points ?? [])
+    .filter(isPoint2)
+    .map(([x, z]) => project(x, z).join(","))
+    .join(" ");
+}
+
+function ringToPath(ring, project) {
+  const points = (ring ?? []).filter(isPoint2);
+
+  if (points.length < 3) return "";
+
+  return (
+    points
+      .map(([x, z], index) => {
+        const [px, py] = project(x, z);
+
+        return `${index === 0 ? "M" : "L"} ${px} ${py}`;
+      })
+      .join(" ") + " Z"
+  );
+}
+
+function polygonToPath(polygon, project) {
+  return (polygon ?? [])
+    .map((ring) => ringToPath(ring, project))
+    .filter(Boolean)
+    .join(" ");
+}
+
 function getBounds(course) {
-  const points = (course.sections ?? [])
-    .filter((section) => section.type === "floor")
-    .flatMap((section) => section.points ?? [])
-    .filter(isPoint2);
+  const points = [];
+
+  function addPoint(point) {
+    if (isPoint2(point)) {
+      points.push(point);
+    }
+  }
+
+  function addPosition(position) {
+    if (isPoint3(position)) {
+      addPoint([position[0], position[2]]);
+    }
+  }
+
+  function addRotatedRectangle(position, width, length, angle = 0) {
+    if (
+      !isPoint3(position) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(length)
+    ) {
+      return;
+    }
+
+    const [cx, , cz] = position;
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+
+    for (const x of [-width / 2, width / 2]) {
+      for (const z of [-length / 2, length / 2]) {
+        addPoint([
+          cx + x * c + z * s,
+          cz - x * s + z * c,
+        ]);
+      }
+    }
+  }
+
+  for (const section of course.sections ?? []) {
+    if (section.type === "floor") {
+      for (const polygon of getFloorPolygons(section)) {
+        for (const ring of polygon) {
+          for (const point of ring) {
+            addPoint(point);
+          }
+        }
+      }
+    } else {
+      const size = section.size ?? [
+        section.width ?? 1,
+        section.height ?? 0.2,
+        section.length ?? 1,
+      ];
+
+      addRotatedRectangle(
+        section.position ?? [0, section.y ?? 0, 0],
+        size[0],
+        size[2],
+        section.rotation?.[1] ?? 0
+      );
+    }
+  }
+
+  for (const ring of course.boundaryRings ?? []) {
+    for (const point of ring) {
+      addPoint(point);
+    }
+  }
+
+  for (const surface of course.surfaces ?? []) {
+    if (Array.isArray(surface.points)) {
+      for (const point of surface.points) {
+        addPoint(point);
+      }
+    } else if (surface.size) {
+      addRotatedRectangle(
+        surface.position,
+        surface.size[0],
+        surface.size[1]
+      );
+    }
+  }
+
+  for (const ramp of course.ramps ?? []) {
+    if (ramp.size) {
+      addRotatedRectangle(
+        ramp.position,
+        ramp.size[0],
+        ramp.size[2],
+        ramp.angle ?? 0
+      );
+    }
+  }
+
+  for (const wall of course.walls ?? []) {
+    const size = wall.size ?? [
+      wall.length ?? 1,
+      wall.height ?? 0.8,
+      wall.thickness ?? 0.2,
+    ];
+
+    addRotatedRectangle(
+      wall.position,
+      size[0],
+      size[2],
+      wall.rotation?.[1] ?? 0
+    );
+  }
+
+  for (const obstacle of course.obstacles ?? []) {
+    addPosition(obstacle.position);
+    addPoint(obstacle.start);
+    addPoint(obstacle.end);
+
+    if (obstacle.size) {
+      addRotatedRectangle(
+        obstacle.position,
+        obstacle.size[0],
+        obstacle.size[2],
+        obstacle.angle ??
+          obstacle.rotation?.[1] ??
+          0
+      );
+    }
+
+    if (
+      obstacle.type === "bumper" ||
+      obstacle.type === "plateau"
+    ) {
+      const radius = obstacle.radius ?? 0.4;
+      const p = obstacle.position;
+
+      if (isPoint3(p)) {
+        addPoint([p[0] - radius, p[2] - radius]);
+        addPoint([p[0] + radius, p[2] + radius]);
+      } else if (isPoint2(p)) {
+        addPoint([p[0] - radius, p[1] - radius]);
+        addPoint([p[0] + radius, p[1] + radius]);
+      }
+    }
+  }
+
+  addPosition(course.ballStart);
+  addPosition(course.hole?.position);
 
   if (!points.length) {
     return {
@@ -43,19 +239,19 @@ function getBounds(course) {
     };
   }
 
-  return {
-    minX: Math.min(...points.map((p) => p[0])),
-    maxX: Math.max(...points.map((p) => p[0])),
-    minZ: Math.min(...points.map((p) => p[1])),
-    maxZ: Math.max(...points.map((p) => p[1])),
-  };
-}
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
 
-function polygonPoints(points, project) {
-  return points
-    .filter(isPoint2)
-    .map(([x, z]) => project(x, z).join(","))
-    .join(" ");
+  for (const [x, z] of points) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
+  }
+
+  return { minX, maxX, minZ, maxZ };
 }
 
 function getSurfaceColor(surface) {
@@ -68,6 +264,34 @@ function getSurfaceColor(surface) {
   );
 }
 
+function MapFloor({ section, project }) {
+  const polygons = getFloorPolygons(section);
+
+  if (!polygons.length) return null;
+
+  return (
+    <g>
+      {polygons.map((polygon, index) => {
+        const path = polygonToPath(polygon, project);
+
+        if (!path) return null;
+
+        return (
+          <path
+            key={index}
+            d={path}
+            fill={section.color ?? "#328b50"}
+            fillRule="evenodd"
+            stroke="#a67b52"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+        );
+      })}
+    </g>
+  );
+}
+
 function MapSurface({ surface, project, scale }) {
   const color = getSurfaceColor(surface);
   const type = surface.surface ?? surface.type;
@@ -75,10 +299,9 @@ function MapSurface({ surface, project, scale }) {
   const stroke =
     type === "water" ? "#7bd8f5" : "#ffffff";
 
-  // Irregular polygon-shaped surfaces.
   if (
     Array.isArray(surface.points) &&
-    surface.points.length >= 3
+    surface.points.filter(isPoint2).length >= 3
   ) {
     return (
       <polygon
@@ -92,7 +315,6 @@ function MapSurface({ surface, project, scale }) {
     );
   }
 
-  // Rectangular surfaces.
   if (
     !isPoint3(surface.position) ||
     !Array.isArray(surface.size)
@@ -114,8 +336,8 @@ function MapSurface({ surface, project, scale }) {
 
   return (
     <rect
-      x={cx - width * scale / 2}
-      y={cy - length * scale / 2}
+      x={cx - (width * scale) / 2}
+      y={cy - (length * scale) / 2}
       width={width * scale}
       height={length * scale}
       fill={color}
@@ -154,12 +376,13 @@ function MapRamp({
   const w = width * scale;
   const l = length * scale;
 
-  // RampRenderer uses Y-axis rotation.
   const angle = ramp.angle ?? 0;
-  const rotation = angle * 180 / Math.PI;
+  const rotation = (angle * 180) / Math.PI;
 
   return (
-    <g transform={`translate(${cx} ${cy}) rotate(${-rotation})`}>
+    <g
+      transform={`translate(${cx} ${cy}) rotate(${-rotation})`}
+    >
       <rect
         x={-w / 2}
         y={-l / 2}
@@ -170,8 +393,6 @@ function MapRamp({
         strokeWidth="1.5"
       />
 
-      {/* Height gradient:
-          high end at negative Z (top). */}
       <rect
         x={-w / 2}
         y={-l / 2}
@@ -180,7 +401,6 @@ function MapRamp({
         fill={`url(#${gradientId})`}
       />
 
-      {/* Launch edge */}
       <line
         x1={-w / 2}
         y1={-l / 2}
@@ -190,7 +410,6 @@ function MapRamp({
         strokeWidth="2.5"
       />
 
-      {/* Entrance edge */}
       <line
         x1={-w / 2}
         y1={l / 2}
@@ -229,7 +448,9 @@ function RotatedRectangle({
 }) {
   if (
     !isPoint3(position) ||
-    !Array.isArray(size)
+    !Array.isArray(size) ||
+    !Number.isFinite(size[0]) ||
+    !Number.isFinite(size[2])
   ) {
     return null;
   }
@@ -249,13 +470,17 @@ function RotatedRectangle({
       stroke={stroke}
       strokeWidth="1.5"
       transform={`translate(${cx} ${cy}) rotate(${
-        -(angle * 180 / Math.PI)
+        -(angle * 180) / Math.PI
       })`}
     />
   );
 }
 
-function MapObstacle({ obstacle, project, scale }) {
+function MapObstacle({
+  obstacle,
+  project,
+  scale,
+}) {
   const {
     type,
     position,
@@ -301,12 +526,13 @@ function MapObstacle({ obstacle, project, scale }) {
   }
 
   if (type === "plateau") {
-    if (!isPoint2(position)) return null;
+    const p = isPoint3(position)
+      ? [position[0], position[2]]
+      : position;
 
-    const [cx, cy] = project(
-      position[0],
-      position[1]
-    );
+    if (!isPoint2(p)) return null;
+
+    const [cx, cy] = project(p[0], p[1]);
 
     return (
       <g>
@@ -427,16 +653,15 @@ function MapObstacle({ obstacle, project, scale }) {
     const thickness =
       (obstacle.bladeWidth ?? 0.35) * scale;
 
+    const angle =
+      obstacle.angle ??
+      obstacle.rotation?.[1] ??
+      0;
+
     return (
       <g
         transform={`translate(${cx} ${cy}) rotate(${
-          -(
-            (obstacle.angle ??
-              obstacle.rotation?.[1] ??
-              0) *
-            180 /
-            Math.PI
-          )
+          -(angle * 180) / Math.PI
         })`}
       >
         <rect
@@ -471,6 +696,38 @@ function MapObstacle({ obstacle, project, scale }) {
   return null;
 }
 
+function MapBoundary({
+  rings,
+  project,
+  style = {},
+  scale,
+}) {
+  if (!Array.isArray(rings)) return null;
+
+  const color = style.color ?? "#795548";
+
+  return (
+    <g
+      fill="none"
+      stroke={color}
+      strokeWidth={Math.max(
+        2,
+        (style.thickness ?? 0.25) * scale
+      )}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      {rings.map((ring, index) => {
+        const path = ringToPath(ring, project);
+
+        if (!path) return null;
+
+        return <path key={index} d={path} />;
+      })}
+    </g>
+  );
+}
+
 function MapWall({ wall, project, scale }) {
   return (
     <RotatedRectangle
@@ -495,15 +752,25 @@ export default function CourseMapRenderer({ course }) {
   const gradientId = useId().replace(/:/g, "");
 
   const bounds = useMemo(
-    () => getBounds(course),
+    () => getBounds(course ?? {}),
     [course]
   );
 
+  if (!course) return null;
+
+  const boundsWidth = Math.max(
+    0.001,
+    bounds.maxX - bounds.minX
+  );
+
+  const boundsHeight = Math.max(
+    0.001,
+    bounds.maxZ - bounds.minZ
+  );
+
   const scale = Math.min(
-    (WIDTH - PADDING * 2) /
-      Math.max(1, bounds.maxX - bounds.minX),
-    (HEIGHT - PADDING * 2) /
-      Math.max(1, bounds.maxZ - bounds.minZ)
+    (WIDTH - PADDING * 2) / boundsWidth,
+    (HEIGHT - PADDING * 2) / boundsHeight
   );
 
   const centerX =
@@ -575,24 +842,16 @@ export default function CourseMapRenderer({ course }) {
         rx="14"
       />
 
-      {/* Course floor polygons */}
+      {/* Playable floor */}
       {(course.sections ?? [])
         .filter(
-          (section) =>
-            section.type === "floor" &&
-            Array.isArray(section.points)
+          (section) => section.type === "floor"
         )
         .map((section, index) => (
-          <polygon
+          <MapFloor
             key={section.id ?? index}
-            points={polygonPoints(
-              section.points,
-              project
-            )}
-            fill={section.color ?? "#328b50"}
-            stroke="#a67b52"
-            strokeWidth="3"
-            strokeLinejoin="round"
+            section={section}
+            project={project}
           />
         ))}
 
@@ -608,7 +867,7 @@ export default function CourseMapRenderer({ course }) {
         )
       )}
 
-      {/* Wedge ramps */}
+      {/* Ramps */}
       {(course.ramps ?? []).map(
         (ramp, index) => (
           <MapRamp
@@ -621,7 +880,7 @@ export default function CourseMapRenderer({ course }) {
         )
       )}
 
-      {/* Course obstacles */}
+      {/* Obstacles */}
       {(course.obstacles ?? []).map(
         (obstacle, index) => (
           <MapObstacle
@@ -633,7 +892,15 @@ export default function CourseMapRenderer({ course }) {
         )
       )}
 
-      {/* Boundary walls */}
+      {/* Perimeter boundary walls */}
+      <MapBoundary
+        rings={course.boundaryRings}
+        project={project}
+        style={course.wallStyle ?? {}}
+        scale={scale}
+      />
+
+      {/* Individual course walls */}
       {(course.walls ?? []).map(
         (wall, index) => (
           <MapWall
@@ -661,14 +928,16 @@ export default function CourseMapRenderer({ course }) {
       )}
 
       {/* Starting ball */}
-      <circle
-        cx={ballX}
-        cy={ballY}
-        r="5"
-        fill="#ffffff"
-        stroke="#222222"
-        strokeWidth="2"
-      />
+      {isPoint3(course.ballStart) && (
+        <circle
+          cx={ballX}
+          cy={ballY}
+          r="5"
+          fill="#ffffff"
+          stroke="#222222"
+          strokeWidth="2"
+        />
+      )}
     </svg>
   );
 }

@@ -29,7 +29,6 @@ export const TERRAIN_MATERIALS = {
 
 export function getTerrainMaterial(type) {
   return (
-    TERRAIN_MATERIALS[type] ??
-    TERRAIN_MATERIALS.grass
+    TERRAIN_MATERIALS[type] ?? TERRAIN_MATERIALS.grass
   );
 }

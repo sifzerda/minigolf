@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Stats } from "@react-three/drei";
-import { Camera, RotateCcw, List } from "lucide-react";
+import { Camera, RotateCcw, List, Pause } from "lucide-react";
 
 import { courses } from "../courses";
 import useGameStore from "../store/useGameStore";
@@ -11,20 +11,19 @@ import useGameStore from "../store/useGameStore";
 import ShotPowerMeter from "./ShotPowerMeter";
 import CourseSession from "./CourseSession";
 
+import FrameRateLimit from "../renderers/FrameRateLimit";
+import { renderActivity } from "../utils/renderActivity";
+import { GamePauseProvider } from "../context/GamePauseContext";
+
+// screens
 import MenuScreen from "../screens/MenuScreen";
 import CoursePreviewScreen from "../screens/CoursePreviewScreen";
 import CourseSelectScreen from "../screens/CourseSelectScreen";
 import CourseCompleteScreen from "../screens/CourseCompleteScreen";
 import GameCompleteScreen from "../screens/GameCompleteScreen";
 import SettingsScreen from "../screens/SettingsScreen";
-import { Pause } from "lucide-react";
 import PauseScreen from "../screens/PauseScreen";
 import AchievementsScreen from "../screens/AchievementsScreen";
-
-import FrameRateLimit from "../renderers/FrameRateLimit";
-import { renderActivity } from "../utils/renderActivity";
-
-import { GamePauseProvider } from "../context/GamePauseContext";
 
 const secondaryButton = "flex w-full items-center justify-center gap-2 rounded-lg border border-[#6e9d7c] bg-[#304c3d] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#40654e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67efb4]";
 const sliderClass = "my-3 block w-full cursor-pointer accent-[#a3ff12] disabled:cursor-not-allowed disabled:opacity-50";
@@ -40,12 +39,9 @@ function SpinControls() {
         <div className="mt-5 border-t border-white/20 pt-4">
             <h3 className="mb-3 text-base font-bold text-[#a3ff12]">Ball Spin</h3>
 
-            <label htmlFor="top-spin"
-                className="flex justify-between gap-2 text-xs text-[#c5d6cc]">
+            <label htmlFor="top-spin" className="flex justify-between gap-2 text-xs text-[#c5d6cc]">
                 <span>Topspin / Backspin</span>
-                <span className="font-semibold text-white">
-                    {Math.round(topSpin * 100)}%
-                </span>
+                <span className="font-semibold text-white">{Math.round(topSpin * 100)}%</span>
             </label>
 
             <input

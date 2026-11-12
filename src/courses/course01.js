@@ -1,21 +1,11 @@
 // src/courses/course01.js
 
-import {
-  createRectangularFloor,
-  createPolygonWalls,
-} from "./courseBuilder";
-
-const points = [
-  [-4, -10],
-  [4, -10],
-  [4, 10],
-  [-4, 10],
-];
+import { createCourseShape } from "./courseBuilder";
 
 const course01 = {
   id: "course-01",
   number: 1,
-  name: "First Steps",
+  name: "The Little Hill",
   environment: "garden",
   par: 2,
 
@@ -26,15 +16,24 @@ const course01 = {
     radius: 0.43,
   },
 
-  sections: [
-    createRectangularFloor({
-      id: "main-floor",
-      width: 8,
-      length: 20,
-    }),
-  ],
+  ...createCourseShape({
+    type: "rounded",
 
-  walls: createPolygonWalls({ points }),
+    points: [
+      [-3, -10],
+      [3, -10],
+      [4, -9],
+      [4, 0],
+      [4, 9],
+      [3, 10],
+      [-3, 10],
+      [-4, 9],
+      [-4, 0],
+      [-4, -9],
+    ],
+
+    samples: 5,
+  }),
 
   surfaces: [],
   ramps: [],
@@ -44,12 +43,18 @@ const course01 = {
     width: 30,
     length: 40,
     resolution: 64,
-
-    // Keep terrain below the playable course.
     baseHeight: -0.15,
-
     color: "#548a43",
-    features: [],
+
+    features: [
+      {
+        type: "ridge",
+        start: [-4, 0],
+        end: [4, 0],
+        width: 4,
+        height: 0.9,
+      },
+    ],
   },
 };
 

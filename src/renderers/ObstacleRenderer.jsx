@@ -15,8 +15,7 @@ import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
 import { VerticalLoop, HorizontalLoop, InclinedLoop } from "./LoopObstacle";
 
-const halfSize = (size) =>
-  size.map((value) => value / 2);
+const halfSize = (size) => size.map((value) => value / 2);
 
 function Bumper({ entity }) {
   const radius = entity.radius ?? 0.5;
@@ -71,7 +70,6 @@ function Block({ entity }) {
 function MovingBarrier({ entity, paused = false }) {
   const bodyRef = useRef(null);
   const elapsedRef = useRef(0);
-
   const size = entity.size ?? [2, 0.6, 0.3];
   const distance = entity.distance ?? 2;
   const speed = entity.speed ?? 1;
@@ -110,83 +108,6 @@ function MovingBarrier({ entity, paused = false }) {
         <meshStandardMaterial
           color={entity.color ?? "#ffcc33"}
         />
-      </mesh>
-    </RigidBody>
-  );
-}
-
-function RevolvingGate({ entity, paused = false }) {
-  const bodyRef = useRef(null);
-  const elapsedRef = useRef(0);
-
-  const radius = Math.max(0.3, entity.radius ?? (entity.bladeLength != null ? entity.bladeLength / 2 : 1.2));
-  const bladeWidth = Math.max(0.08, entity.bladeWidth ?? 0.24);
-  const bladeHeight = Math.max(0.1, entity.bladeHeight ?? 0.35);
-  const bladeCount = Math.max(2, Math.min(8, Math.floor(entity.bladeCount ?? 4)));
-  const speed = Math.max(0, entity.speed ?? 1.2);
-  const direction = entity.direction === -1 ? -1 : 1;
-  const phase = entity.phase ?? 0;
-  const color = entity.color ?? "#e9edf0";
-
-  // Kinematic motion is updated in the fixed Rapier physics step.
-  // The visible blades and their colliders belong to the same rigid body.
-  useBeforePhysicsStep(() => {
-    if (paused) return;
-    const body = bodyRef.current;
-    if (!body) return;
-
-    elapsedRef.current += 1 / 60;
-    const angle = phase + elapsedRef.current * speed * direction;
-
-    body.setNextKinematicRotation({
-      x: 0,
-      y: Math.sin(angle / 2),
-      z: 0,
-      w: Math.cos(angle / 2),
-    });
-  });
-
-  const blades = Array.from({ length: bladeCount }, (_, index) => {
-    const angle = (index * Math.PI * 2) / bladeCount;
-    return {
-      angle,
-      position: [
-        Math.cos(angle) * radius / 2,
-        0,
-        Math.sin(angle) * radius / 2,
-      ],
-    };
-  });
-
-  return (
-    <RigidBody
-      ref={bodyRef}
-      type="kinematicPosition"
-      colliders={false}
-      position={entity.position}
-      rotation={[0, phase, 0]}
-      canSleep={false}
-    >
-      {blades.map((blade, index) => (
-        <group
-          key={index}
-          position={blade.position}
-          rotation={[0, -blade.angle, 0]}
-        >
-          <CuboidCollider
-            args={[radius / 2, bladeHeight / 2, bladeWidth / 2]}
-            restitution={entity.restitution ?? 0.5}
-            friction={entity.friction ?? 0.6}
-          />
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[radius, bladeHeight, bladeWidth]} />
-            <meshStandardMaterial color={color} roughness={0.55} metalness={0.15} />
-          </mesh>
-        </group>
-      ))}
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[0.22, 0.22, bladeHeight + 0.06, 16]} />
-        <meshStandardMaterial color={entity.hubColor ?? "#444b54"} metalness={0.55} roughness={0.4} />
       </mesh>
     </RigidBody>
   );

@@ -31,6 +31,8 @@ import GolfControls from "./GolfControls";
 import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
 import { renderActivity } from "../utils/renderActivity";
 
+import { getCourseHeight } from "../terrain/TerrainFeatures";
+
 const GRAVITY = [0, -9.81, 0];
 
 const FLAG_COLORS = {
@@ -88,7 +90,15 @@ export default function GolfScene({
       <EnvironmentRenderer theme={theme} />
 
       <HoleFlag
-        position={course.hole.position}
+        position={[
+          course.hole.position[0],
+          getCourseHeight(
+            course.hole.position[0],
+            course.hole.position[2],
+            course.terrain
+          ),
+          course.hole.position[2],
+        ]}
         color={
           FLAG_COLORS[theme] ??
           FLAG_COLORS.garden

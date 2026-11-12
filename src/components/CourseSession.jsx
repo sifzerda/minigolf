@@ -1,6 +1,6 @@
 // src/components/CourseSession.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { setupGame, clearGame } from "../ecs/setupGame";
 import { getCourse } from "../courses";
 import GolfScene from "./GolfScene";
@@ -9,8 +9,12 @@ export default function CourseSession({
   courseIndex,
   paused = false,
 }) {
+  // Only retrieve/build a course when its index changes.
+  const course = useMemo(() => getCourse(courseIndex), [courseIndex]
+  );
+
+  // Track which course has completed ECS initialization.
   const [loadedCourse, setLoadedCourse] = useState(null);
-  const course = getCourse(courseIndex);
 
   useEffect(() => {
     if (!course) {
@@ -26,9 +30,15 @@ export default function CourseSession({
     };
   }, [course]);
 
+  // Prevent rendering the scene before setupGame finishes.
   if (!course || loadedCourse !== course) {
     return null;
   }
 
-  return <GolfScene course={course} paused={paused} />;
+  return (
+    <GolfScene
+      course={course}
+      paused={paused}
+    />
+  );
 }

@@ -8,7 +8,7 @@ import {
   getCourseHeight,
   alignPositionToCourse,
   alignObjectToTerrain,
-} from "../terrain/TerrainFeatures";
+} from "../terrain/Terrain";
 
 export function clearGame() {
   for (const entity of [...world.entities]) {

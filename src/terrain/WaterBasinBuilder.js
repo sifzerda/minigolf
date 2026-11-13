@@ -30,19 +30,13 @@ function closeRing(points) {
 
     const last = ring.at(-1);
 
-    if (
-      !last ||
-      last[0] !== p[0] ||
-      last[1] !== p[1]
-    ) {
+    if ( !last || last[0] !== p[0] || last[1] !== p[1] ) {
       ring.push(p);
     }
   }
 
   if (
-    ring.length > 1 &&
-    ring[0][0] === ring.at(-1)[0] &&
-    ring[0][1] === ring.at(-1)[1]
+    ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]
   ) {
     ring.pop();
   }

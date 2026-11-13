@@ -35,11 +35,7 @@ function roundedPolygon(points, radius = 0.5, steps = 6) {
       continue;
     }
 
-    const distance = Math.min(
-      radius,
-      len1 * 0.35,
-      len2 * 0.35
-    );
+    const distance = Math.min(radius, len1 * 0.35, len2 * 0.35);
 
     const start = [
       current[0] + (dx1 / len1) * distance,
@@ -84,10 +80,7 @@ const OUTER = roundedPolygon(
     [-3.2, 10],
     [-4.5, 8.5],
     [-4.5, -8.5],
-  ],
-  0.8,
-  6
-);
+  ], 0.8, 6);
 
 const shape = createCourseShape({
   type: "polygon",
@@ -146,7 +139,7 @@ const course04 = {
     defaultSurface: "grass",
 
     features: [
-      // First rolling hill
+      // First hill
       {
         type: "deformation",
         position: [0, 4.5],
@@ -171,7 +164,7 @@ const course04 = {
         blend: "add",
       },
 
-      // Second, slightly taller hill
+      // Second taller hill
       {
         type: "deformation",
         position: [0, -3.0],
@@ -181,7 +174,7 @@ const course04 = {
         falloff: 1.4,
       },
 
-      // Gentle off-centre mound
+      // small hill
       {
         type: "hill",
         position: [2.3, -5.8],

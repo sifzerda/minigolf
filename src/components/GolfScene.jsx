@@ -31,7 +31,7 @@ import GolfControls from "./GolfControls";
 import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
 import { renderActivity } from "../utils/renderActivity";
 
-import { getCourseHeight } from "../terrain/TerrainFeatures";
+import { getCourseHeight } from "../terrain/Terrain";
 
 const GRAVITY = [0, -9.81, 0];
 

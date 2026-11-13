@@ -19,11 +19,11 @@ import {
   triangulateXZ,
   upwardTriangleIndices,
   subdivideGeometryXZ,
-} from "../terrain/PolygonMesh";
+} from "../terrain/TerrainMesh";
 
-import { prepareTerrainFeatures } from "../terrain/TerrainFeatures";
+import { prepareTerrainFeatures } from "../terrain/Terrain";
 import { useCachedGeometry } from "../terrain/useCachedGeometry";
-import { createTerrainHeightSampler } from "../terrain/TerrainHeightSampler";
+import { createTerrainHeightSampler } from "../terrain/Terrain";
 import { useTrimeshColliderData } from "../terrain/useTrimeshColliderData";
 
 const CIRCLE_SEGMENTS = 64;

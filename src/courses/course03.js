@@ -2,6 +2,12 @@
 
 import { createCourseShape } from "./courseBuilder";
 
+import {
+  roundedPolygon,
+  createIslandSections,
+  createLakeSurface,
+} from "./coursePresets";
+
 // ============================================================
 // COURSE 03 — LAKE ISLAND
 // ============================================================
@@ -12,67 +18,11 @@ const BRIDGE_COLOR = "#a87945";
 const WATER_COLOR = "#1479a8";
 const BASIN_COLOR = "#52636a";
 
-// ------------------------------------------------------------
-// Polygon helpers
-// ------------------------------------------------------------
+// ============================================================
+// COURSE GEOMETRY
+// ============================================================
 
-function roundedPolygon(points, radius = 0.35, steps = 5) {
-  if (!Array.isArray(points) || points.length < 3) {
-    return [];
-  }
-
-  const result = [];
-
-  for (let i = 0; i < points.length; i++) {
-    const previous = points[(i - 1 + points.length) % points.length];
-
-    const current = points[i];
-    const next = points[(i + 1) % points.length];
-
-    const dx1 = previous[0] - current[0];
-    const dz1 = previous[1] - current[1];
-
-    const dx2 = next[0] - current[0];
-    const dz2 = next[1] - current[1];
-
-    const length1 = Math.hypot(dx1, dz1);
-    const length2 = Math.hypot(dx2, dz2);
-
-    if (length1 < 1e-6 || length2 < 1e-6) {
-      result.push([...current]);
-      continue;
-    }
-
-    const distance = Math.min(radius, length1 * 0.35, length2 * 0.35);
-
-    const start = [
-      current[0] + (dx1 / length1) * distance,
-      current[1] + (dz1 / length1) * distance,
-    ];
-
-    const end = [
-      current[0] + (dx2 / length2) * distance,
-      current[1] + (dz2 / length2) * distance,
-    ];
-
-    for (let j = 0; j <= steps; j++) {
-      const t = j / steps;
-      const u = 1 - t;
-
-      const x = u * u * start[0] + 2 * u * t * current[0] + t * t * end[0];
-      const z = u * u * start[1] + 2 * u * t * current[1] + t * t * end[1];
-
-      result.push([x, z]);
-    }
-  }
-
-  return result;
-}
-
-// ------------------------------------------------------------
 // Outer course boundary
-// ------------------------------------------------------------
-
 const OUTER = roundedPolygon(
   [
     [-4.0, -10.0],
@@ -83,15 +33,12 @@ const OUTER = roundedPolygon(
     [-4.0, 10.0],
     [-5.0, 9.0],
     [-5.0, -9.0],
-  ], 0.5, 6);
+  ],
+  0.5,
+  6
+);
 
-// ------------------------------------------------------------
 // Lake outline
-// ------------------------------------------------------------
-
-// The lake occupies the central area between the two greens.
-// Its shape is deliberately inset from the outer course.
-
 const LAKE = roundedPolygon(
   [
     [-2.8, -5.5],
@@ -106,12 +53,12 @@ const LAKE = roundedPolygon(
     [4.1, -2.5],
     [3.8, -4.6],
     [2.8, -5.5],
-  ], 0.4, 5);
+  ],
+  0.4,
+  5
+);
 
-// ------------------------------------------------------------
-// Central island
-// ------------------------------------------------------------
-
+// Central playable island
 const ISLAND = roundedPolygon(
   [
     [-0.8, -3.1],
@@ -126,31 +73,40 @@ const ISLAND = roundedPolygon(
     [1.3, -0.8],
     [1.2, -2.4],
     [0.8, -3.1],
-  ], 0.25, 5);
+  ],
+  0.25,
+  5
+);
 
-// ------------------------------------------------------------
-// Course geometry
-// ------------------------------------------------------------
+// ============================================================
+// PLAYABLE FLOORS
+// ============================================================
 
 const outerShape = createCourseShape({
   type: "polygon",
   points: OUTER,
   color: GRASS_COLOR,
-  wall: { color: SHORE_COLOR, height: 0.65, thickness: 0.25 },
+  wall: {
+    color: SHORE_COLOR,
+    height: 0.65,
+    thickness: 0.25,
+  },
 });
-
-// The island is a separate playable floor.
 
 const islandShape = createCourseShape({
   type: "polygon",
   points: ISLAND,
   color: GRASS_COLOR,
-  wall: { color: SHORE_COLOR, height: 0.65, thickness: 0.25 },
+  wall: {
+    color: SHORE_COLOR,
+    height: 0.65,
+    thickness: 0.25,
+  },
 });
 
-// ------------------------------------------------------------
-// Bridges
-// ------------------------------------------------------------
+// ============================================================
+// BRIDGE HELPER
+// ============================================================
 
 const BRIDGE_WIDTH = 0.7;
 const BRIDGE_THICKNESS = 0.2;
@@ -159,20 +115,34 @@ function createBridge(id, z, length) {
   return {
     id,
     type: "bridge",
-    position: [ 0, -BRIDGE_THICKNESS / 2, z ],
+
+    position: [
+      0,
+      -BRIDGE_THICKNESS / 2,
+      z,
+    ],
+
     rotation: [0, 0, 0],
-    size: [ BRIDGE_WIDTH, BRIDGE_THICKNESS, length ],
+
+    size: [
+      BRIDGE_WIDTH,
+      BRIDGE_THICKNESS,
+      length,
+    ],
+
     color: BRIDGE_COLOR,
+
     rails: false,
     ramps: false,
+
     friction: 0.9,
     restitution: 0,
   };
 }
 
-// ------------------------------------------------------------
-// Course definition
-// ------------------------------------------------------------
+// ============================================================
+// COURSE DEFINITION
+// ============================================================
 
 const course03 = {
   id: "course-03",
@@ -180,24 +150,29 @@ const course03 = {
   name: "Lake Island",
   environment: "garden",
   par: 4,
+
   ballStart: [0, 0.25, 8],
-  hole: { position: [0, 0, -8], radius: 0.43 },
+
+  hole: {
+    position: [0, 0, -8],
+    radius: 0.43,
+  },
 
   // ----------------------------------------------------------
   // Playable floors
   // ----------------------------------------------------------
 
-sections: [
-  ...outerShape.sections,
-  ...islandShape.sections.map((section, index) => ({
-    ...section,
-    id: `island-floor-${index}`,
-    excludeWater: true,
-  })),
-],
+  sections: [
+    ...outerShape.sections,
+
+    ...createIslandSections(
+      islandShape.sections,
+      { id: "island" }
+    ),
+  ],
 
   // ----------------------------------------------------------
-  // Course perimeter
+  // Course boundary
   // ----------------------------------------------------------
 
   boundaryRings: [OUTER],
@@ -213,32 +188,43 @@ sections: [
   walls: [],
 
   // ----------------------------------------------------------
-  // Lake
+  // Water hazard
   // ----------------------------------------------------------
 
   surfaces: [
-    {
+    createLakeSurface({
       id: "lake-water",
-      type: "water",
-      surface: "water",
-      position: [0, 0, 0],
+
       points: LAKE,
       holes: [ISLAND],
+
+      position: [0, 0, 0],
+
       depth: 0.65,
+
       color: WATER_COLOR,
       basinColor: BASIN_COLOR,
+
       respawnPosition: [0, 0.5, 8],
-    },
+    }),
   ],
 
   // ----------------------------------------------------------
-  // Obstacles
+  // Bridges
   // ----------------------------------------------------------
 
   obstacles: [
+    createBridge(
+      "bridge-start-island",
+      4.3,
+      3.0
+    ),
 
-    createBridge("bridge-start-island", 4.3, 3.0),
-    createBridge("bridge-island-hole", -4.3, 3.0),
+    createBridge(
+      "bridge-island-hole",
+      -4.3,
+      3.0
+    ),
   ],
 
   ramps: [],
@@ -251,8 +237,10 @@ sections: [
     width: 30,
     length: 40,
     resolution: 64,
+
     baseHeight: 0,
     defaultSurface: "grass",
+
     features: [],
   },
 };

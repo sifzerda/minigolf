@@ -2,11 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-
-import {
-  RigidBody,
-  TrimeshCollider,
-} from "@react-three/rapier";
+import { RigidBody, TrimeshCollider } from "@react-three/rapier";
 
 const DEFAULT_COLOR = "#b8a58a";
 const SEGMENTS = 32;
@@ -25,8 +21,7 @@ function getHeight(t, height) {
   const entranceEnd = 0.16;
   const lipStart = 0.84;
 
-  const slope =
-    height / (1 - entranceEnd / 2 - (1 - lipStart) / 2);
+  const slope = height / (1 - entranceEnd / 2 - (1 - lipStart) / 2);
 
   if (t <= entranceEnd) {
     // Smoothly increase slope from zero.

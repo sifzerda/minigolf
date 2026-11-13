@@ -15,7 +15,6 @@ import {
   geometryKey,
 } from "../terrain/GeometryCache";
 
-
 import {
   triangulateXZ,
   upwardTriangleIndices,
@@ -27,7 +26,6 @@ import { useCachedGeometry } from "../terrain/useCachedGeometry";
 import { createTerrainHeightSampler } from "../terrain/TerrainHeightSampler";
 import { useTrimeshColliderData } from "../terrain/useTrimeshColliderData";
 
-const EPSILON = 1e-6;
 const CIRCLE_SEGMENTS = 64;
 
 // --------------------------------------------------

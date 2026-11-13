@@ -2,6 +2,16 @@
 
 import { createCourseShape } from "./courseBuilder";
 
+// ============================================================
+// COURSE 02 — Sand Fork
+// ============================================================
+
+const GRASS_COLOR = "#328b50";
+const WALL_COLOR = "#806d55";
+const SAND_COLOR = "#d8bc7a";
+
+// ------------------------------------------------------------
+
 const course02 = {
   id: "course-02",
   number: 2,
@@ -75,10 +85,10 @@ const course02 = {
       },
     ],
 
-    color: "#398f53",
+    color: GRASS_COLOR,
 
     wall: {
-      color: "#806d55",
+      color: WALL_COLOR,
       height: 0.65,
       thickness: 0.25,
     },
@@ -91,7 +101,7 @@ const course02 = {
       surface: "sand",
       position: [2.6, 0, 6],
       size: [3, 3.8],
-      color: "#d8bc7a",
+      color: SAND_COLOR,
     },
 
     // Lower-left sand bunker
@@ -99,7 +109,7 @@ const course02 = {
       surface: "sand",
       position: [-3.2, 0, -5.7],
       size: [3, 3],
-      color: "#d8bc7a",
+      color: SAND_COLOR,
     },
   ],
 

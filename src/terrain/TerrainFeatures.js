@@ -6,28 +6,48 @@ import {
   smoothstep,
 } from "./TerrainSpline";
 
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+// ============================================================
+// UTILITIES
+// ============================================================
 
-function hill(x, z, feature) {
-  const [cx, cz] = feature.position;
+const clamp = (value, min, max) =>
+  Math.max(min, Math.min(max, value));
 
-  return (
-    (feature.height ?? 1) * (1 - smoothstep(Math.hypot(x - cx, z - cz) / Math.max(0.001, feature.radius ?? 3)))
-  );
+const EPSILON = 0.001;
+
+function positive(value, fallback) {
+  return Math.max(EPSILON, value ?? fallback);
 }
 
-function deformation(x, z, feature) {
+// ============================================================
+// UNIFIED RADIAL DEFORMATION
+// ============================================================
+
+function radialDeformation(
+  x,
+  z,
+  feature,
+  {
+    amplitude = 0,
+    defaultRadius = 3,
+    useEllipse = false,
+    falloff = 1,
+  } = {}
+) {
   const [cx, cz] = feature.position;
 
-  const radiusX = Math.max(
-    0.001,
-    feature.radiusX ?? feature.radius ?? 3
+  const radius = positive(
+    feature.radius,
+    defaultRadius
   );
 
-  const radiusZ = Math.max(
-    0.001,
-    feature.radiusZ ?? feature.radius ?? 3
-  );
+  const radiusX = useEllipse
+    ? positive(feature.radiusX, radius)
+    : radius;
+
+  const radiusZ = useEllipse
+    ? positive(feature.radiusZ, radius)
+    : radius;
 
   const dx = (x - cx) / radiusX;
   const dz = (z - cz) / radiusZ;
@@ -36,38 +56,97 @@ function deformation(x, z, feature) {
 
   if (distance >= 1) return 0;
 
-  const falloff = Math.max(
-    0.1,
-    feature.falloff ?? 1
-  );
+  const influence =
+    1 - smoothstep(distance);
 
-  const influence = Math.pow(
-    1 - smoothstep(distance),
-    falloff
+  const exponent = Math.max(
+    0.1,
+    feature.falloff ?? falloff
   );
 
   return (
-    (feature.height ?? 0) *
-    influence
+    amplitude *
+    Math.pow(influence, exponent)
+  );
+}
+
+// ============================================================
+// RADIAL FEATURE TYPES
+// ============================================================
+
+function hill(x, z, feature) {
+  return radialDeformation(
+    x,
+    z,
+    feature,
+    {
+      amplitude: feature.height ?? 1,
+    }
   );
 }
 
 function valley(x, z, feature) {
-  return -hill(x, z, {
-    ...feature,
-    height: feature.depth ?? 1,
-  });
+  return radialDeformation(
+    x,
+    z,
+    feature,
+    {
+      amplitude: -(feature.depth ?? 1),
+    }
+  );
 }
 
-function ridge(x, z, feature) {
-  const [ax, az] = feature.start;
-  const [bx, bz] = feature.end;
+function bowl(x, z, feature) {
+  return radialDeformation(
+    x,
+    z,
+    feature,
+    {
+      amplitude: -(feature.depth ?? 1),
+    }
+  );
+}
 
+function mound(x, z, feature) {
+  return hill(x, z, feature);
+}
+
+function deformation(x, z, feature) {
+  return radialDeformation(
+    x,
+    z,
+    feature,
+    {
+      amplitude: feature.height ?? 0,
+      useEllipse: true,
+    }
+  );
+}
+
+// ============================================================
+// LINEAR FEATURES
+// ============================================================
+
+function distanceToSegment(
+  x,
+  z,
+  ax,
+  az,
+  bx,
+  bz
+) {
   const dx = bx - ax;
   const dz = bz - az;
-  const lengthSquared = dx * dx + dz * dz;
 
-  if (!lengthSquared) return 0;
+  const lengthSquared =
+    dx * dx + dz * dz;
+
+  if (lengthSquared < 1e-10) {
+    return Math.hypot(
+      x - ax,
+      z - az
+    );
+  }
 
   const t = clamp(
     (
@@ -78,9 +157,23 @@ function ridge(x, z, feature) {
     1
   );
 
-  const distance = Math.hypot(
+  return Math.hypot(
     x - ax - t * dx,
     z - az - t * dz
+  );
+}
+
+function ridge(x, z, feature) {
+  const [ax, az] = feature.start;
+  const [bx, bz] = feature.end;
+
+  const distance = distanceToSegment(
+    x,
+    z,
+    ax,
+    az,
+    bx,
+    bz
   );
 
   return (
@@ -89,36 +182,82 @@ function ridge(x, z, feature) {
       1 -
       smoothstep(
         distance /
-        Math.max(0.001, feature.width ?? 2)
+        positive(feature.width, 2)
+      )
+    )
+  );
+}
+
+function ledge(x, z, feature) {
+  const [ax, az] = feature.start;
+  const [bx, bz] = feature.end;
+
+  const distance = distanceToSegment(
+    x,
+    z,
+    ax,
+    az,
+    bx,
+    bz
+  );
+
+  const halfWidth =
+    positive(feature.width, 2) / 2;
+
+  const edgeWidth =
+    positive(feature.edgeWidth, 0.5);
+
+  return (
+    (feature.height ?? 1.5) *
+    (
+      1 -
+      smoothstep(
+        (distance - halfWidth) /
+        edgeWidth
       )
     )
   );
 }
 
 function slope(x, z, feature) {
-  const [dx, dz] = feature.direction ?? [1, 0];
+  const [dx, dz] =
+    feature.direction ?? [1, 0];
 
   return (
-    (x * dx + z * dz) * (feature.gradient ?? 0.1)
+    (x * dx + z * dz) *
+    (feature.gradient ?? 0.1)
   );
 }
 
+// ============================================================
+// PLATEAUS AND CLIFFS
+// ============================================================
+
 function plateau(x, z, feature) {
   const [cx, cz] = feature.position;
+
+  const distance = Math.hypot(
+    x - cx,
+    z - cz
+  );
+
+  const radius = positive(
+    feature.radius,
+    5
+  );
+
+  const edgeWidth = positive(
+    feature.edgeWidth,
+    2
+  );
 
   return (
     (feature.height ?? 2) *
     (
       1 -
       smoothstep(
-        (
-          Math.hypot(x - cx, z - cz) -
-          Math.max(0.001, feature.radius ?? 5)
-        ) /
-        Math.max(
-          0.001,
-          feature.edgeWidth ?? 2
-        )
+        (distance - radius) /
+        edgeWidth
       )
     )
   );
@@ -130,15 +269,18 @@ function cliff(x, z, feature) {
 
   const dx = bx - ax;
   const dz = bz - az;
+
   const length = Math.hypot(dx, dz);
 
-  if (length < 0.001) return 0;
+  if (length < EPSILON) return 0;
 
-  const distance = (x - ax) * (-dz / length) + (z - az) * (dx / length);
+  const distance =
+    (x - ax) * (-dz / length) +
+    (z - az) * (dx / length);
 
-  const sharpness = Math.max(
-    0.001,
-    feature.sharpness ?? 0.5
+  const sharpness = positive(
+    feature.sharpness,
+    0.5
   );
 
   return (
@@ -150,50 +292,9 @@ function cliff(x, z, feature) {
   );
 }
 
-function ledge(x, z, feature) {
-  const [ax, az] = feature.start;
-  const [bx, bz] = feature.end;
-
-  const dx = bx - ax;
-  const dz = bz - az;
-  const lengthSquared = dx * dx + dz * dz;
-
-  if (lengthSquared < 0.001) return 0;
-
-  const t = clamp(
-    (
-      (x - ax) * dx +
-      (z - az) * dz
-    ) / lengthSquared,
-    0,
-    1
-  );
-
-  const distance = Math.hypot(
-    x - ax - t * dx,
-    z - az - t * dz
-  );
-
-  return (
-    (feature.height ?? 1.5) *
-    (
-      1 -
-      smoothstep(
-        (
-          distance -
-          Math.max(
-            0.001,
-            feature.width ?? 2
-          ) / 2
-        ) /
-        Math.max(
-          0.001,
-          feature.edgeWidth ?? 0.5
-        )
-      )
-    )
-  );
-}
+// ============================================================
+// SPLINE FEATURES
+// ============================================================
 
 function splinePath(x, z, feature, spline) {
   const sample = sampleTerrainSpline(
@@ -202,7 +303,10 @@ function splinePath(x, z, feature, spline) {
     spline
   );
 
-  return sample.height * sample.influence;
+  return (
+    sample.height *
+    sample.influence
+  );
 }
 
 function splineRidge(x, z, feature, spline) {
@@ -218,40 +322,23 @@ function splineRidge(x, z, feature, spline) {
       1 -
       smoothstep(
         sample.distance /
-        Math.max(
-          0.001,
-          feature.width ?? 3
-        )
+        positive(feature.width, 3)
       )
     )
   );
 }
 
 function splineValley(x, z, feature, spline) {
+  const sample = sampleTerrainSpline(
+    x,
+    z,
+    spline
+  );
+
   return (
     -(feature.depth ?? 2) *
-    sampleTerrainSpline(x, z, spline).influence
+    sample.influence
   );
-}
-
-function bowl(x, z, feature) {
-  const [cx, cz] = feature.position;
-
-  const t = clamp(
-    Math.hypot(x - cx, z - cz) /
-    Math.max(0.001, feature.radius ?? 3),
-    0,
-    1
-  );
-
-  return (
-    -(feature.depth ?? 1) *
-    (1 - smoothstep(t))
-  );
-}
-
-function mound(x, z, feature) {
-  return hill(x, z, feature);
 }
 
 function bankedPath(x, z, feature, spline) {
@@ -266,9 +353,13 @@ function bankedPath(x, z, feature, spline) {
 
     const dx = b.x - a.x;
     const dz = b.z - a.z;
-    const lengthSquared = dx * dx + dz * dz;
 
-    if (lengthSquared < 1e-10) continue;
+    const lengthSquared =
+      dx * dx + dz * dz;
+
+    if (lengthSquared < 1e-10) {
+      continue;
+    }
 
     const t = clamp(
       (
@@ -298,10 +389,14 @@ function bankedPath(x, z, feature, spline) {
   }
 
   const halfWidth =
-    Math.max(0.01, feature.width ?? 4) / 2;
+    positive(feature.width, 4) / 2;
 
   const distance = Math.sqrt(best);
-  const edgeWidth = feature.edgeWidth ?? 1;
+
+  const edgeWidth = positive(
+    feature.edgeWidth,
+    1
+  );
 
   if (distance > halfWidth + edgeWidth) {
     return 0;
@@ -311,7 +406,7 @@ function bankedPath(x, z, feature, spline) {
     1 -
     smoothstep(
       (distance - halfWidth) /
-      Math.max(0.001, edgeWidth)
+      edgeWidth
     );
 
   return (
@@ -321,20 +416,26 @@ function bankedPath(x, z, feature, spline) {
   );
 }
 
+// ============================================================
+// FEATURE REGISTRY
+// ============================================================
+
 const FEATURE_GENERATORS = {
   hill,
-  deformation,
   valley,
+  bowl,
+  mound,
+  deformation,
+
   ridge,
+  ledge,
   slope,
   plateau,
   cliff,
-  ledge,
+
   splinePath,
   splineRidge,
   splineValley,
-  bowl,
-  mound,
   bankedPath,
 };
 
@@ -345,12 +446,18 @@ const SPLINE_TYPES = new Set([
   "bankedPath",
 ]);
 
+// ============================================================
+// FEATURE PREPARATION
+// ============================================================
+
 export function prepareTerrainFeatures(terrain) {
   return (terrain?.features ?? []).map(
     (feature) => ({
       feature,
+
       generator:
         FEATURE_GENERATORS[feature.type],
+
       spline: SPLINE_TYPES.has(feature.type)
         ? createTerrainSpline(feature)
         : null,
@@ -358,13 +465,86 @@ export function prepareTerrainFeatures(terrain) {
   );
 }
 
+// ============================================================
+// blending helper
+
+const BLEND_MODES = new Set([
+  "add",
+  "max",
+  "min",
+  "replace",
+]);
+
+function blendTerrainHeight(
+  currentHeight,
+  contribution,
+  feature,
+  baseHeight
+) {
+  const mode = feature.blend ?? "add";
+
+  if (!BLEND_MODES.has(mode)) {
+    return currentHeight + contribution;
+  }
+
+  const strength = clamp(
+    feature.strength ?? 1,
+    0,
+    1
+  );
+
+  switch (mode) {
+    case "max": {
+      const target = baseHeight + contribution;
+
+      return currentHeight +
+        (Math.max(currentHeight, target) -
+          currentHeight) *
+        strength;
+    }
+
+    case "min": {
+      const target = baseHeight + contribution;
+
+      return currentHeight +
+        (Math.min(currentHeight, target) -
+          currentHeight) *
+        strength;
+    }
+
+    case "replace": {
+      // A replace feature supplies an absolute
+      // target height and a spatial influence.
+      const target =
+        feature.targetHeight ?? baseHeight;
+
+      const influence = clamp(
+        Math.abs(contribution),
+        0,
+        1
+      );
+
+      return currentHeight + (target - currentHeight) * influence * strength;
+    }
+
+    default: return currentHeight + contribution * strength;
+  }
+}
+
+// ============================================================
+// HEIGHT SAMPLING
+// ============================================================
+
 export function getTerrainHeight(
   x,
   z,
   terrain,
   preparedFeatures = null
 ) {
-  let height = terrain?.baseHeight ?? 0;
+  const baseHeight =
+    terrain?.baseHeight ?? 0;
+
+  let height = baseHeight;
 
   const features =
     preparedFeatures ??
@@ -373,41 +553,27 @@ export function getTerrainHeight(
   for (const entry of features) {
     if (!entry.generator) continue;
 
-    height += entry.generator(
+    const contribution = entry.generator(
       x,
       z,
       entry.feature,
       entry.spline
+    );
+
+    height = blendTerrainHeight(
+      height,
+      contribution,
+      entry.feature,
+      baseHeight
     );
   }
 
   return height;
 }
 
-export function alignObjectToTerrain(
-  object,
-  terrain
-) {
-  if (
-    !object?.terrainAlign ||
-    !terrain ||
-    !Array.isArray(object.position)
-  ) {
-    return object;
-  }
-
-  const [x, y = 0, z] = object.position;
-  const floorHeight = getTerrainHeight(x, z, terrain) - (terrain.baseHeight ?? 0);
-
-  return {
-    ...object,
-    position: [
-      x,
-      floorHeight + y,
-      z,
-    ],
-  };
-}
+// ============================================================
+// COURSE HEIGHT
+// ============================================================
 
 export function getCourseHeight(
   x,
@@ -428,6 +594,41 @@ export function getCourseHeight(
   );
 }
 
+// ============================================================
+// OBJECT ALIGNMENT
+// ============================================================
+
+export function alignObjectToTerrain(
+  object,
+  terrain
+) {
+  if (
+    !object?.terrainAlign ||
+    !terrain ||
+    !Array.isArray(object.position)
+  ) {
+    return object;
+  }
+
+  const [x, y = 0, z] =
+    object.position;
+
+  const floorHeight = getCourseHeight(
+    x,
+    z,
+    terrain
+  );
+
+  return {
+    ...object,
+    position: [
+      x,
+      floorHeight + y,
+      z,
+    ],
+  };
+}
+
 export function alignPositionToCourse(
   position,
   terrain,
@@ -441,7 +642,8 @@ export function alignPositionToCourse(
 
   return [
     x,
-    getCourseHeight(x, z, terrain) + offsetY,
+    getCourseHeight(x, z, terrain) +
+    offsetY,
     z,
   ];
 }

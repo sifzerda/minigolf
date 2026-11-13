@@ -83,10 +83,7 @@ const OUTER = roundedPolygon(
     [-4.0, 10.0],
     [-5.0, 9.0],
     [-5.0, -9.0],
-  ],
-  0.5,
-  6
-);
+  ], 0.5, 6);
 
 // ------------------------------------------------------------
 // Lake outline
@@ -109,10 +106,7 @@ const LAKE = roundedPolygon(
     [4.1, -2.5],
     [3.8, -4.6],
     [2.8, -5.5],
-  ],
-  0.4,
-  5
-);
+  ], 0.4, 5);
 
 // ------------------------------------------------------------
 // Central island
@@ -132,10 +126,7 @@ const ISLAND = roundedPolygon(
     [1.3, -0.8],
     [1.2, -2.4],
     [0.8, -3.1],
-  ],
-  0.25,
-  5
-);
+  ], 0.25, 5);
 
 // ------------------------------------------------------------
 // Course geometry
@@ -144,14 +135,8 @@ const ISLAND = roundedPolygon(
 const outerShape = createCourseShape({
   type: "polygon",
   points: OUTER,
-
   color: GRASS_COLOR,
-
-  wall: {
-    color: SHORE_COLOR,
-    height: 0.65,
-    thickness: 0.25,
-  },
+  wall: { color: SHORE_COLOR, height: 0.65, thickness: 0.25 },
 });
 
 // The island is a separate playable floor.
@@ -159,14 +144,8 @@ const outerShape = createCourseShape({
 const islandShape = createCourseShape({
   type: "polygon",
   points: ISLAND,
-
   color: GRASS_COLOR,
-
-  wall: {
-    color: SHORE_COLOR,
-    height: 0.65,
-    thickness: 0.25,
-  },
+  wall: { color: SHORE_COLOR, height: 0.65, thickness: 0.25 },
 });
 
 // ------------------------------------------------------------
@@ -180,26 +159,12 @@ function createBridge(id, z, length) {
   return {
     id,
     type: "bridge",
-
-    position: [
-      0,
-      -BRIDGE_THICKNESS / 2,
-      z,
-    ],
-
+    position: [ 0, -BRIDGE_THICKNESS / 2, z ],
     rotation: [0, 0, 0],
-
-    size: [
-      BRIDGE_WIDTH,
-      BRIDGE_THICKNESS,
-      length,
-    ],
-
+    size: [ BRIDGE_WIDTH, BRIDGE_THICKNESS, length ],
     color: BRIDGE_COLOR,
-
     rails: false,
     ramps: false,
-
     friction: 0.9,
     restitution: 0,
   };
@@ -212,31 +177,18 @@ function createBridge(id, z, length) {
 const course03 = {
   id: "course-03",
   number: 3,
-
   name: "Lake Island",
   environment: "garden",
-
   par: 4,
-
-  // Starting green at the south end (positive Z).
   ballStart: [0, 0.25, 8],
-
-  // Hole green at the north end (negative Z).
-  hole: {
-    position: [0, 0, -8],
-    radius: 0.43,
-  },
+  hole: { position: [0, 0, -8], radius: 0.43 },
 
   // ----------------------------------------------------------
   // Playable floors
   // ----------------------------------------------------------
 
 sections: [
-  // Main course floor — preserve its original ID
-  // so CourseGeometryRenderer cuts the golf cup.
   ...outerShape.sections,
-
-  // Separate central island floor
   ...islandShape.sections.map((section, index) => ({
     ...section,
     id: `island-floor-${index}`,
@@ -247,10 +199,6 @@ sections: [
   // ----------------------------------------------------------
   // Course perimeter
   // ----------------------------------------------------------
-
-  // Only the outside boundary has a raised wall.
-  // No walls around the lake or island, so the
-  // bridges have unobstructed entrances.
 
   boundaryRings: [OUTER],
 
@@ -271,23 +219,14 @@ sections: [
   surfaces: [
     {
       id: "lake-water",
-
       type: "water",
       surface: "water",
-
       position: [0, 0, 0],
-
-      // Outer lake boundary.
       points: LAKE,
-
-      // The island is excluded from the water geometry.
       holes: [ISLAND],
-
       depth: 0.65,
-
       color: WATER_COLOR,
       basinColor: BASIN_COLOR,
-
       respawnPosition: [0, 0.5, 8],
     },
   ],
@@ -297,31 +236,9 @@ sections: [
   // ----------------------------------------------------------
 
   obstacles: [
-    // Starting green -> island.
-    //
-    // Lake begins near Z = +5.5.
-    // Island begins near Z = +3.1.
-    //
-    // Bridge spans Z = 2.8 to 5.8.
 
-    createBridge(
-      "bridge-start-island",
-      4.3,
-      3.0
-    ),
-
-    // Island -> hole green.
-    //
-    // Island ends near Z = -3.1.
-    // Lake ends near Z = -5.5.
-    //
-    // Bridge spans Z = -5.8 to -2.8.
-
-    createBridge(
-      "bridge-island-hole",
-      -4.3,
-      3.0
-    ),
+    createBridge("bridge-start-island", 4.3, 3.0),
+    createBridge("bridge-island-hole", -4.3, 3.0),
   ],
 
   ramps: [],
@@ -334,13 +251,8 @@ sections: [
     width: 30,
     length: 40,
     resolution: 64,
-
     baseHeight: 0,
-
     defaultSurface: "grass",
-
-    // Flat terrain ensures that the two bridges
-    // align with the playable grass.
     features: [],
   },
 };

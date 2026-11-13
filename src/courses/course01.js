@@ -2,6 +2,14 @@
 
 import { createCourseShape } from "./courseBuilder";
 
+// ============================================================
+// COURSE 01 — SMALL HILL
+// ============================================================
+
+const GRASS_COLOR = "#328b50";
+
+// ============================================================
+
 const course01 = {
   id: "course-01",
   number: 1,
@@ -44,7 +52,7 @@ const course01 = {
     length: 40,
     resolution: 64,
     baseHeight: -0.15,
-    color: "#548a43",
+    color: GRASS_COLOR,
 
     features: [
       {

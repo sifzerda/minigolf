@@ -4,12 +4,12 @@ import { createCourseShape } from "./courseBuilder";
 import { roundedPolygon } from "./coursePresets";
 
 // ============================================================
-// COURSE 06 — MYSTERY TUNNELS
+// COURSE 06 — MYSTERY CAVERNS
 // ============================================================
 
 const GRASS_COLOR = "#328b50";
-const WALL_COLOR = "#786b50";
-const BOX_COLOR = "#99968d";
+const WALL_COLOR = "#806d55";
+const ROCK_COLOR = "#82796b";
 
 // ============================================================
 // COURSE GEOMETRY
@@ -17,16 +17,16 @@ const BOX_COLOR = "#99968d";
 
 const OUTER = roundedPolygon(
   [
-    [-4, -11],
-    [4, -11],
-    [5, -10],
-    [5, 10],
-    [4, 11],
-    [-4, 11],
-    [-5, 10],
-    [-5, -10],
+    [-5, -12],
+    [5, -12],
+    [6, -11],
+    [6, 11],
+    [5, 12],
+    [-5, 12],
+    [-6, 11],
+    [-6, -11],
   ],
-  0.8,
+  0.6,
   6
 );
 
@@ -34,31 +34,102 @@ const shape = createCourseShape({
   type: "polygon",
   points: OUTER,
   color: GRASS_COLOR,
+
+  wall: {
+    color: WALL_COLOR,
+    height: 0.55,
+    thickness: 0.25,
+  },
 });
+
+// ============================================================
+// HIDDEN EXIT DESTINATIONS
+// ============================================================
+
+// One of these destinations leads straight
+// into the golf cup.
+//
+// The entrances are randomly assigned to
+// these exits each course session.
+
+const EXITS = [
+  // Left destination
+  {
+    position: [-3.4, 0.25, -7],
+    velocity: [0, 0, -1.2],
+  },
+
+  // Winning destination
+  {
+    position: [0, 0.38, -9.4],
+    velocity: [0, -0.3, 0],
+  },
+
+  // Right destination
+  {
+    position: [3.4, 0.25, -7],
+    velocity: [0, 0, -1.2],
+  },
+];
+
+// ============================================================
+// CAVERN HELPER
+// ============================================================
+
+function createMysteryCavern(index, x) {
+  return {
+    id: `mystery-cavern-${index + 1}`,
+    type: "cavern",
+
+    position: [x, 0, 0],
+    rotation: [0, 0, 0],
+
+    size: [2.9, 2.45, 5],
+
+    openingWidth: 1.4,
+    openingHeight: 1.1,
+
+    segments: 16,
+    rings: 6,
+    seed: 106 + index,
+
+    color: ROCK_COLOR,
+    friction: 0.85,
+    restitution: 0.15,
+
+    // Optional behaviour supported by
+    // the updated CavernRenderer.
+    portal: {
+      group: "course-06-mystery",
+      entranceIndex: index,
+      exits: EXITS,
+    },
+  };
+}
 
 // ============================================================
 // COURSE DEFINITION
 // ============================================================
 
 const course06 = {
-  ...shape,
-
   id: "course-06",
   number: 6,
-  name: "Mystery Tunnels",
+  name: "Mystery Caverns",
   environment: "garden",
   par: 2,
 
-  ballStart: [0, 0.25, 9],
+  ballStart: [0, 0.25, 9.5],
 
   hole: {
-    position: [0, 0, -4.2],
+    position: [0, 0, -9.4],
     radius: 0.43,
   },
 
   // ----------------------------------------------------------
-  // Boundaries
+  // Playable floor
   // ----------------------------------------------------------
+
+  ...shape,
 
   boundaryRings: [OUTER],
 
@@ -75,50 +146,51 @@ const course06 = {
   ramps: [],
 
   // ----------------------------------------------------------
-  // Mystery tunnel box
+  // Three cavern openings inside a large box
   // ----------------------------------------------------------
 
   obstacles: [
+    // Main rectangular roof
     {
-      id: "mystery-tunnels",
-      type: "mysteryTunnels",
+      id: "cavern-roof",
+      type: "block",
 
-      position: [0, 0, 0],
+      position: [0, 3.15, 0],
+      size: [11, 1.1, 5.2],
 
-      size: [10, 2.4, 7],
-
-      openingWidth: 1.35,
-      openingHeight: 1.15,
-
-      color: BOX_COLOR,
-
-      friction: 0.8,
-      restitution: 0.25,
-
-      exits: [
-        // Left exit
-        {
-          position: [-3, 0.26, -3.8],
-          velocity: [0, 0, -2.5],
-        },
-
-        // Centre exit — directly into the cup
-        {
-          position: [0, 0.28, -4.2],
-          velocity: [0, -0.35, 0],
-        },
-
-        // Right exit
-        {
-          position: [3, 0.26, -3.8],
-          velocity: [0, 0, -2.5],
-        },
-      ],
+      color: ROCK_COLOR,
     },
+
+    // Left end support
+    {
+      id: "cavern-left-support",
+      type: "block",
+
+      position: [-5.1, 1.3, 0],
+      size: [0.8, 2.6, 5.2],
+
+      color: ROCK_COLOR,
+    },
+
+    // Right end support
+    {
+      id: "cavern-right-support",
+      type: "block",
+
+      position: [5.1, 1.3, 0],
+      size: [0.8, 2.6, 5.2],
+
+      color: ROCK_COLOR,
+    },
+
+    // Three independent cavern passages.
+    createMysteryCavern(0, -3.1),
+    createMysteryCavern(1, 0),
+    createMysteryCavern(2, 3.1),
   ],
 
   // ----------------------------------------------------------
-  // Terrain
+  // Flat terrain
   // ----------------------------------------------------------
 
   terrain: {

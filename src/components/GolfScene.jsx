@@ -2,19 +2,11 @@
 
 import { useRef, useEffect, useMemo } from "react";
 import { Physics } from "@react-three/rapier";
-
-import {
-  ballQuery,
-  holeQuery,
-  obstacleQuery,
-  rampQuery,
-  surfaceQuery,
-} from "../ecs/world";
+import { ballQuery, holeQuery, obstacleQuery, rampQuery, surfaceQuery} from "../ecs/world";
 
 import GolfBall from "../physics/GolfBall";
 import HoleSensor from "../physics/HoleSensor";
 import BallPhysicsSystem from "../ecs/systems/BallPhysicsSystem";
-
 import CourseGeometryRenderer from "../renderers/CourseGeometryRenderer";
 import RampRenderer from "../renderers/RampRenderer";
 import SurfaceRenderer from "../renderers/SurfaceRenderer";
@@ -25,12 +17,10 @@ import GolfClub from "../renderers/GolfClub";
 import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
 import HoleFlag from "../renderers/HoleFlag";
 import TerrainRenderer from "../renderers/TerrainRenderer";
-
 import GolfControls from "./GolfControls";
 
 import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
 import { renderActivity } from "../utils/renderActivity";
-
 import { getCourseHeight } from "../terrain/Terrain";
 
 const GRAVITY = [0, -9.81, 0];
@@ -51,8 +41,7 @@ export default function GolfScene({
   const settledRef = useRef(false);
   const activeSurfaceRef = useRef("grass");
 
-  const entities = useMemo(
-    () => ({
+  const entities = useMemo(() => ({
       ball: [...ballQuery][0],
       hole: [...holeQuery][0],
       obstacles: [...obstacleQuery],
@@ -113,9 +102,7 @@ export default function GolfScene({
         colliders={false}
         paused={paused}
       >
-        {course.terrain && (
-          <TerrainRenderer terrain={course.terrain} sections={course.sections} />
-        )}
+        {course.terrain && (<TerrainRenderer terrain={course.terrain} sections={course.sections} />)}
 
         <CourseGeometryRenderer course={course} />
 

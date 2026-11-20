@@ -1,10 +1,5 @@
 import { useEffect, useMemo } from "react";
-import {
-  BufferGeometry,
-  Float32BufferAttribute,
-  DoubleSide,
-  Vector3,
-} from "three";
+import { BufferGeometry, Float32BufferAttribute, DoubleSide, Vector3 } from "three";
 import { RigidBody, TrimeshCollider } from "@react-three/rapier";
 import { createLoopPath } from "../terrain/loopTrack.js";
 
@@ -15,10 +10,7 @@ function makeStrip(left, right, desiredNormals) {
   const indices = [];
 
   for (let i = 0; i < left.length; i++) {
-    vertices.push(
-      left[i].x, left[i].y, left[i].z,
-      right[i].x, right[i].y, right[i].z
-    );
+    vertices.push(left[i].x, left[i].y, left[i].z, right[i].x, right[i].y, right[i].z);
   }
 
   for (let i = 0; i < left.length - 1; i++) {

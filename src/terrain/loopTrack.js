@@ -61,12 +61,23 @@ export function createLoopPath(entity, mode = entity.type) {
   );
   const rise = inclined ? Math.max(0.25, entity.rise ?? 1.1) : 0;
   const verticalForward = entity.verticalAdvance === "forward";
+  const lateralAdvance = vertical && verticalForward
+    ? Math.max(0, entity.verticalLateralOffset ?? 0)
+    : 0;
 
   // Unit tangent along the start and end of every complete turn.
   // "x"-drifting vertical loops retain the original layout by default.
   const tangent = vertical && verticalForward
-    ? new Vector3(0, 0, -1)
-    : new Vector3(spacing, 0, -TAU * radius).normalize();
+    ? new Vector3(
+      lateralAdvance,
+      0,
+      -spacing - TAU * radius
+    ).normalize()
+    : new Vector3(
+      spacing,
+      0,
+      -TAU * radius
+    ).normalize();
 
   const core = [];
   const turnsAt = [];
@@ -86,11 +97,25 @@ export function createLoopPath(entity, mode = entity.type) {
         (vertical ? radius * (1 - Math.cos(a)) : 0) +
         rise * smoothstep((turn + u) / loops);
 
-      add(new Vector3(
-        origin.x + (vertical && verticalForward ? 0 : drift + (vertical ? 0 : radius * (1 - Math.cos(a)))),
-        y,
-        origin.z - radius * Math.sin(a) - (vertical && verticalForward ? drift : 0)
-      ), turn + u);
+      add(
+        new Vector3(
+          origin.x + (
+            vertical && verticalForward
+              ? lateralAdvance * u
+              : drift +
+              (vertical
+                ? 0
+                : radius * (1 - Math.cos(a)))
+          ),
+
+          y,
+
+          origin.z -
+          radius * Math.sin(a) -
+          (vertical && verticalForward ? drift : 0)
+        ),
+        turn + u
+      );
     }
 
     const last = core.at(-1);

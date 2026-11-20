@@ -43,29 +43,25 @@ const shape = createCourseShape({
 });
 
 // ============================================================
-// HIDDEN EXIT DESTINATIONS
+// MYSTERY EXITS
 // ============================================================
 
-// One of these destinations leads straight
-// into the golf cup.
-//
-// The entrances are randomly assigned to
-// these exits each course session.
+// The CavernRenderer shuffles a one-to-one mapping
+// between these destinations once per session.
+// Exit positions are WORLD coordinates.
 
 const EXITS = [
-  // Left destination
   {
     position: [-3.4, 0.25, -7],
     velocity: [0, 0, -1.2],
   },
 
-  // Winning destination
+  // Winning destination — directly above the cup.
   {
     position: [0, 0.38, -9.4],
     velocity: [0, -0.3, 0],
   },
 
-  // Right destination
   {
     position: [3.4, 0.25, -7],
     velocity: [0, 0, -1.2],
@@ -73,45 +69,65 @@ const EXITS = [
 ];
 
 // ============================================================
-// CAVERN HELPER
+// ONE SOLID MASS WITH THREE TUNNELS
 // ============================================================
 
-function createMysteryCavern(index, x) {
-  return {
-    id: `mystery-cavern-${index + 1}`,
-    type: "cavern",
+const TUNNEL_X = [-3.2, 0, 3.2];
 
-    position: [x, 0, 0],
-    rotation: [0, 0, 0],
+const MYSTERY_CAVERNS = {
+  id: "course-06-mystery-caverns",
+  type: "cavern",
 
-    size: [2.9, 2.45, 5],
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
 
-    openingWidth: 1.4,
-    openingHeight: 1.1,
+  // One solid rectangular structure.
+  mass: {
+    shape: "box",
+    size: [11, 3.5, 5],
+  },
 
-    segments: 16,
-    rings: 6,
-    seed: 106 + index,
+  // Carve three passages through the mass.
+  tunnels: TUNNEL_X.map((x, entranceIndex) => ({
+    id: `mystery-passage-${entranceIndex + 1}`,
 
-    color: ROCK_COLOR,
-    friction: 0.85,
-    restitution: 0.15,
+    shape: "round",
+    radius: 0.85,
+    segments: 24,
 
-    // Optional behaviour supported by
-    // the updated CavernRenderer.
+    // Tunnel coordinates are local to the mass.
+    // Extend beyond both faces for complete openings.
+    from: [x, 0.8, 3.5],
+    to: [x, 0.8, -3.5],
+
+    // Mystery teleport functionality.
     portal: {
       group: "course-06-mystery",
-      entranceIndex: index,
+      entranceIndex,
+
       exits: EXITS,
+
+      // Sensor just inside the entrance.
+      sensorPosition: [x, 0.8, 1.8],
+      sensorRadius: 0.55,
+
+      // Activate only when entering the tunnel.
+      requireForward: true,
     },
-  };
-}
+  })),
+
+  color: ROCK_COLOR,
+  friction: 0.85,
+  restitution: 0.15,
+};
 
 // ============================================================
 // COURSE DEFINITION
 // ============================================================
 
 const course06 = {
+  ...shape,
+
   id: "course-06",
   number: 6,
   name: "Mystery Caverns",
@@ -126,10 +142,8 @@ const course06 = {
   },
 
   // ----------------------------------------------------------
-  // Playable floor
+  // Boundaries
   // ----------------------------------------------------------
-
-  ...shape,
 
   boundaryRings: [OUTER],
 
@@ -146,51 +160,15 @@ const course06 = {
   ramps: [],
 
   // ----------------------------------------------------------
-  // Three cavern openings inside a large box
+  // Obstacles
   // ----------------------------------------------------------
 
   obstacles: [
-    // Main rectangular roof
-    {
-      id: "cavern-roof",
-      type: "block",
-
-      position: [0, 3.15, 0],
-      size: [11, 1.1, 5.2],
-
-      color: ROCK_COLOR,
-    },
-
-    // Left end support
-    {
-      id: "cavern-left-support",
-      type: "block",
-
-      position: [-5.1, 1.3, 0],
-      size: [0.8, 2.6, 5.2],
-
-      color: ROCK_COLOR,
-    },
-
-    // Right end support
-    {
-      id: "cavern-right-support",
-      type: "block",
-
-      position: [5.1, 1.3, 0],
-      size: [0.8, 2.6, 5.2],
-
-      color: ROCK_COLOR,
-    },
-
-    // Three independent cavern passages.
-    createMysteryCavern(0, -3.1),
-    createMysteryCavern(1, 0),
-    createMysteryCavern(2, 3.1),
+    MYSTERY_CAVERNS,
   ],
 
   // ----------------------------------------------------------
-  // Flat terrain
+  // Terrain
   // ----------------------------------------------------------
 
   terrain: {

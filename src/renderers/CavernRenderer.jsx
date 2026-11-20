@@ -1,350 +1,190 @@
-// src/renderers/CavernRenderer.jsx
-
-// general use solid that can be a box. rounded, rock or other mass with tunnels going through
-
-import { useMemo, useEffect } from "react";
-import { RigidBody, TrimeshCollider, CuboidCollider } from "@react-three/rapier";
-import { BufferGeometry, BufferAttribute, DoubleSide } from "three";
+import { useEffect, useMemo } from "react";
+import { RigidBody, TrimeshCollider, BallCollider } from "@react-three/rapier";
+import { BufferGeometry, Float32BufferAttribute, DoubleSide, Euler, Vector3 } from "three";
 import useGameStore from "../store/useGameStore";
+import { createSolidWithTunnels, getTunnelPoints } from "../terrain/createSolidWithTunnels";
 
-// ============================================================
-// DETERMINISTIC RANDOM
-// ============================================================
-
-function createRandom(seed) {
+// Existing course05 / old course06 geometry remains available when mass is omitted.
+function legacyArch({ width, height, length, openingWidth, openingHeight, segments, rings, seed }) {
   let state = seed >>> 0;
-
-  return () => {
+  const random = () => {
     state = (Math.imul(1664525, state) + 1013904223) >>> 0;
     return state / 4294967296;
   };
-}
-
-// ============================================================
-// CAVERN GEOMETRY
-// ============================================================
-
-function createCavernGeometry({
-  width,
-  height,
-  length,
-  openingWidth,
-  openingHeight,
-  segments,
-  rings,
-  seed,
-}) {
-  const random = createRandom(seed);
-
   const vertices = [];
   const indices = [];
-
   const burial = 0.6;
   const stride = segments + 1;
   const layerSize = (rings + 1) * stride;
-  const vertexIndex = (layer, ring, segment) => layer * layerSize + ring * stride + segment;
+  const at = (layer, ring, segment) => layer * layerSize + ring * stride + segment;
+  const quad = (a, b, c, d) => indices.push(a, b, c, a, c, d);
 
-  function quad(a, b, c, d) {
-    indices.push(a, b, c, a, c, d);
-  }
-
-  // Outer rock surface and inner passage.
   for (let layer = 0; layer < 2; layer++) {
     const inner = layer === 1;
-
-    const radiusX = (inner ? openingWidth : width) / 2;
-    const radiusY = (inner ? openingHeight : height) + burial;
-
+    const rx = (inner ? openingWidth : width) / 2;
+    const ry = (inner ? openingHeight : height) + burial;
     for (let ring = 0; ring <= rings; ring++) {
       const z = (ring / rings - 0.5) * length;
-
-      for (let segment = 0; segment <= segments; segment++) {
-        const angle = (segment / segments) * Math.PI;
+      for (let s = 0; s <= segments; s++) {
+        const theta = s / segments * Math.PI;
         const variation = inner ? 1 : 0.85 + random() * 0.3;
-        vertices.push(Math.cos(angle) * radiusX * variation, Math.sin(angle) * radiusY * variation - burial, z);
+        vertices.push(Math.cos(theta) * rx * variation, Math.sin(theta) * ry * variation - burial, z);
       }
     }
   }
-
-  // Longitudinal surfaces.
   for (let ring = 0; ring < rings; ring++) {
     for (let s = 0; s < segments; s++) {
-      const a = vertexIndex(0, ring, s);
-      const b = a + 1;
-      const c = b + stride;
-      const d = a + stride;
-
-      // Outer surface
-      quad(a, b, c, d);
-      // Inner surface
-      quad(a + layerSize, d + layerSize, c + layerSize, b + layerSize);
+      const a = at(0, ring, s);
+      quad(a, a + 1, a + stride + 1, a + stride);
+      const b = a + layerSize;
+      quad(b, b + stride, b + stride + 1, b + 1);
     }
   }
-
-  // Entrance and exit rock faces.
   for (let s = 0; s < segments; s++) {
-    const a = vertexIndex(0, 0, s);
-    const b = a + 1;
-
-    quad(a, a + layerSize, b + layerSize, b);
-
-    const c = vertexIndex(0, rings, s);
-    const d = c + 1;
-
-    quad(c, d, d + layerSize, c + layerSize);
+    const a = at(0, 0, s);
+    quad(a, a + layerSize, a + layerSize + 1, a + 1);
+    const b = at(0, rings, s);
+    quad(b, b + 1, b + layerSize + 1, b + layerSize);
   }
-
-  // Underground bases of the rock walls.
   for (let ring = 0; ring < rings; ring++) {
-    const a = vertexIndex(0, ring, 0);
-    const b = a + stride;
-
-    quad(a, b, b + layerSize, a + layerSize);
-
-    const c = vertexIndex(0, ring, segments);
-    const d = c + stride;
-
-    quad(c, c + layerSize, d + layerSize, d);
+    const a = at(0, ring, 0);
+    quad(a, a + stride, a + stride + layerSize, a + layerSize);
+    const b = at(0, ring, segments);
+    quad(b, b + layerSize, b + stride + layerSize, b + stride);
   }
-
-  const positions = new Float32Array(vertices);
-  const triangles = new Uint32Array(indices);
   const geometry = new BufferGeometry();
-
-  geometry.setAttribute("position", new BufferAttribute(positions, 3));
-  geometry.setIndex(new BufferAttribute(triangles, 1));
-
+  geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-
   return {
     geometry,
-    collider: [positions, triangles],
+    collider: [new Float32Array(vertices), new Uint32Array(indices)],
   };
 }
 
+const portalMappings = new Map();
 
-const portalRoutes = new Map();
-
-function getPortalMapping(group, sessionId, count) {
-  const previous = portalRoutes.get(group);
-
-  if (
-    previous?.sessionId === sessionId && previous.mapping.length === count
-  ) {
-    return previous.mapping;
-  }
-
-  // Every entrance receives a different exit.
-  const mapping = Array.from({ length: count }, (_, index) => index
-);
-
-  // Fisher-Yates shuffle.
+function mappingFor(group, sessionId, count) {
+  const current = portalMappings.get(group);
+  if (current?.sessionId === sessionId && current.count === count) return current.mapping;
+  const mapping = Array.from({ length: count }, (_, i) => i);
   for (let i = mapping.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-
-    [mapping[i], mapping[j]] = [ mapping[j], mapping[i] ];
+    [mapping[i], mapping[j]] = [mapping[j], mapping[i]];
   }
-
-  portalRoutes.set(group, {
-    sessionId,
-    mapping,
-  });
-
+  portalMappings.set(group, { sessionId, count, mapping });
   return mapping;
 }
 
+const vec = (p) => new Vector3(...p);
 
-// ============================================================
-// CAVERN RENDERER
-// ============================================================
+function portalSensors(entity, length, openingHeight) {
+  if (!entity.mass) {
+    return entity.portal ? [{
+      portal: entity.portal,
+      position: [0, openingHeight / 2, length / 2 - 0.7],
+      radius: Math.min(entity.openingWidth ?? 1.9, openingHeight) * 0.35,
+      direction: [0, 0, -1],
+    }] : [];
+  }
 
-export default function CavernRenderer({
-  entity,
-  ballRef,
-  paused = false,
-}) {
+  return (entity.tunnels ?? []).filter((tunnel) => tunnel.portal).map((tunnel) => {
+    const points = getTunnelPoints(tunnel);
+    const direction = vec(points[1]).sub(vec(points[0])).normalize();
+    const portal = tunnel.portal;
+    const position = portal.sensorPosition ?? vec(points[0])
+      .addScaledVector(direction, portal.sensorOffset ?? 1.2).toArray();
+    return {
+      portal,
+      position,
+      radius: portal.sensorRadius ?? (tunnel.radius ?? 0.8) * 0.65,
+      direction: direction.toArray(),
+    };
+  });
+}
+
+export default function CavernRenderer({ entity, ballRef, paused = false }) {
   const {
     position = [0, 0, 0],
     rotation = [0, 0, 0],
-
     size = [6, 3.6, 6.5],
-
     openingWidth = 1.9,
     openingHeight = 1.7,
-
     segments = 12,
     rings = 6,
     seed = 105,
-
     color = "#82796b",
     friction = 0.85,
     restitution = 0.2,
-
-    // Optional: only mystery caverns need this.
-    portal = null,
   } = entity;
-
   const [width, height, length] = size;
 
-  // ==========================================================
-  // GEOMETRY
-  // ==========================================================
+  const built = useMemo(() => entity.mass
+    ? createSolidWithTunnels(entity.mass, entity.tunnels ?? [])
+    : legacyArch({ width, height, length, openingWidth, openingHeight, segments, rings, seed }),
+  [entity.mass, entity.tunnels, width, height, length, openingWidth, openingHeight, segments, rings, seed]);
 
-  const { geometry, collider } = useMemo(
-    () =>
-      createCavernGeometry({
-        width,
-        height,
-        length,
-        openingWidth,
-        openingHeight,
-        segments,
-        rings,
-        seed,
-      }),
-    [
-      width,
-      height,
-      length,
-      openingWidth,
-      openingHeight,
-      segments,
-      rings,
-      seed,
-    ]
+  useEffect(() => () => built.geometry.dispose(), [built]);
+
+  const sensors = useMemo(
+    () => portalSensors(entity, length, openingHeight),
+    [entity.mass, entity.tunnels, entity.portal, entity.openingWidth, length, openingHeight]
   );
 
-  useEffect(() => {
-    return () => geometry.dispose();
-  }, [geometry]);
-
-  // ==========================================================
-  // OPTIONAL PORTAL BEHAVIOUR
-  // ==========================================================
-
-  function onPortalEnter(event) {
-    if (!portal || paused) return;
-
+  function enterPortal(event, sensor) {
+    if (paused) return;
     const ball = event.other.rigidBody;
     const object = event.other.rigidBodyObject;
+    if (!ball || !(
+      object?.userData?.isGolfBall || ball.userData?.isGolfBall ||
+      (ballRef?.current && ball.handle === ballRef.current.handle)
+    )) return;
 
-    if (!ball) return;
+    const store = useGameStore.getState();
+    if (store.completed || store.gameComplete) return;
 
-    const isGolfBall =
-      object?.userData?.isGolfBall === true ||
-      ball.userData?.isGolfBall === true ||
-      (
-        ballRef?.current &&
-        ball.handle === ballRef.current.handle
-      );
+    const v = ball.linvel();
+    const worldDir = new Vector3(...sensor.direction)
+      .applyEuler(new Euler(...rotation));
+    if (sensor.portal.requireForward !== false &&
+        v.x * worldDir.x + v.y * worldDir.y + v.z * worldDir.z < 0.05) return;
 
-    if (!isGolfBall) return;
-
-    const state = useGameStore.getState();
-
-    if (state.completed || state.gameComplete) {
-      return;
-    }
-
-    const velocity = ball.linvel();
-
-    // Only activate when rolling into the
-    // front entrance (towards negative Z).
-    if (velocity.z >= -0.05) return;
-
-    const exits = portal.exits ?? [];
-
+    const exits = sensor.portal.exits ?? [];
     if (!exits.length) return;
-
-    const mapping = getPortalMapping(
-      portal.group ?? "mystery-caverns",
-      state.sessionId,
+    const mapping = mappingFor(
+      sensor.portal.group ?? entity.id ?? "cavern",
+      store.sessionId,
       exits.length
     );
+    const index = mapping[sensor.portal.entranceIndex ?? 0];
+    const exit = exits[index];
+    if (!exit) return;
 
-    const exitIndex =
-      mapping[portal.entranceIndex];
-
-    const destination = exits[exitIndex];
-
-    if (!destination) return;
-
-    const [x, y, z] = destination.position;
-    const [vx, vy, vz] =
-      destination.velocity ?? [0, 0, 0];
-
-    // Teleport the original rigid body.
-    ball.setTranslation(
-      { x, y, z },
-      true
-    );
-
-    // Clear existing momentum and forces.
+    const [x, y, z] = exit.position;
+    const [vx, vy, vz] = exit.velocity ?? [0, 0, 0];
+    ball.setTranslation({ x, y, z }, true);
     ball.resetForces(true);
     ball.resetTorques(true);
-
-    ball.setLinvel(
-      { x: vx, y: vy, z: vz },
-      true
-    );
-
-    ball.setAngvel(
-      { x: 0, y: 0, z: 0 },
-      true
-    );
-
+    ball.setLinvel({ x: vx, y: vy, z: vz }, true);
+    ball.setAngvel({ x: 0, y: 0, z: 0 }, true);
     ball.wakeUp();
   }
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
-      position={position}
-      rotation={rotation}
-    >
-      {/* Original cavern geometry and collision */}
-      <TrimeshCollider
-        args={collider}
-        friction={friction}
-        restitution={restitution}
-      />
-
-      <mesh
-        geometry={geometry}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color={color}
-          roughness={1}
-          flatShading
-          side={DoubleSide}
-        />
+    <RigidBody type="fixed" colliders={false} position={position} rotation={rotation}>
+      <TrimeshCollider args={built.collider} friction={friction} restitution={restitution} />
+      <mesh geometry={built.geometry} castShadow receiveShadow>
+        <meshStandardMaterial color={color} side={DoubleSide} roughness={1} flatShading />
       </mesh>
-
-      {/* Only mystery caverns get a portal sensor */}
-      {portal && (
-        <CuboidCollider
+      {sensors.map((sensor, i) => (
+        <BallCollider
+          key={i}
           sensor
-          position={[
-            0,
-            openingHeight / 2,
-            length / 2 - 0.7,
-          ]}
-          args={[
-            openingWidth * 0.38,
-            openingHeight * 0.48,
-            0.22,
-          ]}
-          onIntersectionEnter={onPortalEnter}
+          position={sensor.position}
+          args={[sensor.radius]}
+          onIntersectionEnter={(event) => enterPortal(event, sensor)}
         />
-      )}
+      ))}
     </RigidBody>
   );
 }

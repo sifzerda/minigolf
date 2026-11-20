@@ -1,7 +1,6 @@
 // src/renderers/HoleFlag.jsx
 
 import { DoubleSide } from "three";
-
 export default function HoleFlag({
   position,
   color = "#ff4545",

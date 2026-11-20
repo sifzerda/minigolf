@@ -14,6 +14,7 @@ import useGameStore from "../store/useGameStore";
 import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
 import { VerticalLoop, HorizontalLoop, InclinedLoop } from "./LoopObstacle";
+import CavernRenderer from "./CavernRenderer";
 
 const halfSize = (size) => size.map((value) => value / 2);
 
@@ -1264,6 +1265,7 @@ const OBSTACLE_COMPONENTS = {
   plateau: Plateau,
   cliff: Cliff,
   ledge: Ledge,
+  cavern: CavernRenderer,
 };
 
 export default function ObstacleRenderer({ entity, ballRef, paused = false }) {

@@ -1,40 +1,74 @@
 // src/courses/course16.js
-import { createRectangularFloor, createPolygonWalls } from "./courseBuilder";
+import { createCourseShape } from "./courseBuilder";
+import { ridge } from "./terrainPresets";
 
-const width = 9;
-const length = 26;
-const points = [
-  [-width / 2, -length / 2],
-  [width / 2, -length / 2],
-  [width / 2, length / 2],
-  [-width / 2, length / 2],
-];
+// COURSE 16 — FOUR CORNERS
+// Sharp turns and rolling grades punish shots that are too powerful.
+
+const GRASS_COLOR = "#328b50";
+const WALL_STYLE = {
+  color: "#786b50", height: 0.55, thickness: 0.25,
+  friction: 0.8, restitution: 0.3,
+};
+
+const shape = createCourseShape({
+  type: "path",
+  points: [
+      [-2.5, 9],
+      [2.6, 6],
+      [2.6, 1],
+      [-2.6, -1],
+      [-2.6, -6],
+      [2.5, -8],
+      [2.5, -10]
+    ],
+  width: 2.6,
+  curved: false,
+  color: GRASS_COLOR,
+  wall: WALL_STYLE,
+});
 
 const course16 = {
+  ...shape,
   id: "course-16",
   number: 16,
-  name: "Clockwork Crossing",
-  environment: "neon",
+  name: "Four Corners",
+  environment: "garden",
   par: 5,
-  ballStart: [0, 0.25, 11],
-  hole: { position: [0, 0, -11], radius: 0.43 },
-  sections: [
-    createRectangularFloor({
-      id: "main-floor",
-      width,
-      length,
-      color: "#245e5d",
-    }),
+
+  ballStart: [-2.5, 0.25, 9],
+  hole: { position: [2.5, 0, -10], radius: 0.43 },
+
+  walls: [],
+  surfaces: [
+    { id: "sand-1", surface: "sand", position: [2.7, 0, 5.7], size: [1.7, 1.6], color: "#d8bc7a" },
+    { id: "sand-2", surface: "sand", position: [-2.6, 0, -5.5], size: [1.8, 1.8], color: "#d8bc7a" },
   ],
-  walls: createPolygonWalls({ points }),
-  surfaces: [],
   ramps: [],
-  obstacles: [
-    { type: "rotatingGate", position: [-2, 0.65, 4], size: [2.2, 1, 0.25], pivot: "left", speed: 0.9, direction: 1, color: "#00d8ff" },
-    { type: "rotatingGate", position: [2, 0.65, 0], size: [2.2, 1, 0.25], pivot: "right", speed: 1.1, direction: -1, color: "#f9ad3d" },
-    { type: "movingBarrier", position: [0, 0.5, -4.5], size: [1.5, 0.9, 0.3], distance: 2, speed: 0.85, color: "#b865f5" },
-    { type: "bumper", position: [0, 0.4, -8], radius: 0.5, color: "#ff5599" },
-  ],
+  obstacles: [],
+
+  terrain: {
+    width: 32,
+    length: 42,
+    resolution: 96,
+    baseHeight: 0,
+    defaultSurface: "grass",
+    color: GRASS_COLOR,
+    features: [
+      ridge({
+        start: [-4, 4],
+        end: [4, 4],
+        width: 3,
+        height: 0.35
+      }),
+      ridge({
+        start: [-4, -4],
+        end: [4, -4],
+        width: 3,
+        height: 0.45
+      }),
+    ],
+  },
 };
 
 export default course16;

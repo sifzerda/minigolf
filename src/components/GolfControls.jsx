@@ -11,22 +11,14 @@ const MAX_CHARGE_TIME = 1.5;
 const ROTATION_SENSITIVITY = 0.005;
 const SPIN_STEP = 0.2;
 
-const clamp = (value, min, max) =>
-  Math.max(min, Math.min(max, value));
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-export default function GolfControls({
-  ballRef,
-  settledRef,
-  startPosition,
-  paused = false,
-}) {
+export default function GolfControls({ ballRef, settledRef, startPosition, paused = false }) {
   const { gl } = useThree();
-
   const dragging = useRef(false);
   const charging = useRef(false);
   const chargeStart = useRef(0);
   const jumpCharge = useRef(false);
-
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
@@ -57,14 +49,7 @@ export default function GolfControls({
 
     renderActivity.wake(250);
 
-    const power = clamp(
-      (performance.now() - chargeStart.current) /
-        1000 /
-        MAX_CHARGE_TIME,
-      0.1,
-      1
-    );
-
+    const power = clamp((performance.now() - chargeStart.current) / 1000 / MAX_CHARGE_TIME, 0.1, 1);
     const state = useGameStore.getState();
 
     if (Math.abs(state.power - power) >= 0.01) {
@@ -77,16 +62,8 @@ export default function GolfControls({
 
     const canShoot = () => {
       if (pausedRef.current) return false;
-
       const state = useGameStore.getState();
-
-      return (
-        !state.completed &&
-        !state.gameComplete &&
-        !state.shotRequest &&
-        settledRef.current &&
-        !!ballRef.current
-      );
+      return (!state.completed && !state.gameComplete && !state.shotRequest && settledRef.current && !!ballRef.current);
     };
 
     const startCharge = (jump) => {
@@ -100,11 +77,7 @@ export default function GolfControls({
       chargeStart.current = performance.now();
 
       const state = useGameStore.getState();
-
-      state.setChargeMode(
-        jump ? "jump" : "normal"
-      );
-
+      state.setChargeMode(jump ? "jump" : "normal");
       state.setPower(0.1);
       state.setCharging(true);
     };
@@ -114,28 +87,15 @@ export default function GolfControls({
       if (!charging.current) return;
 
       renderActivity.wake(1000);
-
       charging.current = false;
-
       const state = useGameStore.getState();
-
-      const power = clamp(
-        (performance.now() - chargeStart.current) /
-          1000 /
-          MAX_CHARGE_TIME,
-        0.1,
-        1
-      );
+      const power = clamp((performance.now() - chargeStart.current) / 1000 / MAX_CHARGE_TIME, 0.1, 1);
 
       state.setPower(power);
       state.setCharging(false);
 
       if (canShoot()) {
-        state.requestShot(
-          power,
-          state.aimAngle,
-          jumpCharge.current
-        );
+        state.requestShot(power, state.aimAngle, jumpCharge.current);
       }
 
       state.setChargeMode("normal");
@@ -163,11 +123,7 @@ export default function GolfControls({
       renderActivity.wake(300);
 
       const state = useGameStore.getState();
-
-      state.setAimAngle(
-        state.aimAngle -
-          event.movementX * ROTATION_SENSITIVITY
-      );
+      state.setAimAngle(state.aimAngle - event.movementX * ROTATION_SENSITIVITY);
     };
 
     const onPointerUp = (event) => {
@@ -188,15 +144,9 @@ export default function GolfControls({
       if (event.target !== canvas) return;
 
       event.preventDefault();
-
       renderActivity.wake(500);
-
       const state = useGameStore.getState();
-
-      state.setCameraDistance(
-        state.cameraDistance +
-          event.deltaY * 0.01
-      );
+      state.setCameraDistance(state.cameraDistance + event.deltaY * 0.01);
     };
 
     const onKeyDown = (event) => {
@@ -204,15 +154,7 @@ export default function GolfControls({
 
       const target = event.target;
 
-      if (
-        target instanceof HTMLElement &&
-        (
-          target.closest(
-            "input, textarea, select, button"
-          ) ||
-          target.isContentEditable
-        )
-      ) {
+      if (target instanceof HTMLElement && (target.closest("input, textarea, select, button") || target.isContentEditable)) {
         return;
       }
 
@@ -221,67 +163,33 @@ export default function GolfControls({
       const state = useGameStore.getState();
 
       const actions = {
-        KeyW: () =>
-          state.setTopSpin(
-            state.topSpin + SPIN_STEP
-          ),
-
-        KeyS: () =>
-          state.setTopSpin(
-            state.topSpin - SPIN_STEP
-          ),
-
-        KeyQ: () =>
-          state.setSideSpin(
-            state.sideSpin - SPIN_STEP
-          ),
-
-        KeyE: () =>
-          state.setSideSpin(
-            state.sideSpin + SPIN_STEP
-          ),
-
+        KeyW: () => state.setTopSpin(state.topSpin + SPIN_STEP),
+        KeyS: () => state.setTopSpin(state.topSpin - SPIN_STEP),
+        KeyQ: () => state.setSideSpin(state.sideSpin - SPIN_STEP),
+        KeyE: () => state.setSideSpin(state.sideSpin + SPIN_STEP),
         KeyX: () => state.resetSpin(),
 
         Space: () => {
           if (!charging.current && canShoot()) {
-            state.requestShot(
-              state.power,
-              state.aimAngle,
-              false
-            );
+            state.requestShot(state.power, state.aimAngle, false);
           }
         },
 
         KeyJ: () => {
           if (!charging.current && canShoot()) {
-            state.requestShot(
-              state.power,
-              state.aimAngle,
-              true
-            );
+            state.requestShot(state.power, state.aimAngle, true);
           }
         },
 
         KeyR: () => {
-          state.clearShotRequest(
-            state.shotRequest?.id
-          );
-
-          resetBall(
-            ballRef.current,
-            startPosition,
-            settledRef
-          );
+          state.clearShotRequest(state.shotRequest?.id);
+          resetBall(ballRef.current, startPosition, settledRef);
         },
       };
 
       if (!actions[event.code]) return;
 
-      if (
-        event.code === "Space" ||
-        event.code === "KeyJ"
-      ) {
+      if (event.code === "Space" || event.code === "KeyJ") {
         event.preventDefault();
       }
 
@@ -301,86 +209,28 @@ export default function GolfControls({
       jumpCharge.current = false;
 
       const state = useGameStore.getState();
-
       state.setChargeMode("normal");
       state.setCharging(false);
     };
 
-    window.addEventListener(
-      "pointerdown",
-      onPointerDown
-    );
-
-    window.addEventListener(
-      "pointermove",
-      onPointerMove
-    );
-
-    window.addEventListener(
-      "pointerup",
-      onPointerUp
-    );
-
-    window.addEventListener(
-      "wheel",
-      onWheel,
-      { passive: false }
-    );
-
-    window.addEventListener(
-      "keydown",
-      onKeyDown
-    );
-
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
     window.addEventListener("blur", onBlur);
-
-    canvas.addEventListener(
-      "contextmenu",
-      onContextMenu
-    );
+    canvas.addEventListener("contextmenu", onContextMenu);
 
     return () => {
-      window.removeEventListener(
-        "pointerdown",
-        onPointerDown
-      );
-
-      window.removeEventListener(
-        "pointermove",
-        onPointerMove
-      );
-
-      window.removeEventListener(
-        "pointerup",
-        onPointerUp
-      );
-
-      window.removeEventListener(
-        "wheel",
-        onWheel
-      );
-
-      window.removeEventListener(
-        "keydown",
-        onKeyDown
-      );
-
-      window.removeEventListener(
-        "blur",
-        onBlur
-      );
-
-      canvas.removeEventListener(
-        "contextmenu",
-        onContextMenu
-      );
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", onBlur);
+      canvas.removeEventListener("contextmenu", onContextMenu);
     };
-  }, [
-    gl,
-    ballRef,
-    settledRef,
-    startPosition,
-  ]);
+  }, [ gl, ballRef, settledRef, startPosition ]);
 
   return null;
 }

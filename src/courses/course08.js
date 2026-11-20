@@ -1,51 +1,70 @@
 // src/courses/course08.js
 
-import { createRectangularFloor, createPolygonWalls } from "./courseBuilder";
+import { createCourseShape } from "./courseBuilder";
+import { hill, valley } from "./terrainPresets";
 
-const points = [[-3, -10], [3, -10], [3, 10], [-3, 10]];
+// COURSE 08 — SWITCHBACK
+// A winding corridor that rewards bank shots instead of raw power.
+
+const GRASS_COLOR = "#328b50";
+const WALL_STYLE = {
+  color: "#786b50", height: 0.55, thickness: 0.25,
+  friction: 0.8, restitution: 0.3,
+};
+
+const shape = createCourseShape({
+  type: "path",
+  points: [
+      [0, 9],
+      [0, 6],
+      [-2.6, 3],
+      [2.5, 0],
+      [-2.4, -3],
+      [2, -6],
+      [0, -9]
+    ],
+  width: 3.3,
+  curved: true,
+  color: GRASS_COLOR,
+  wall: WALL_STYLE,
+});
 
 const course08 = {
+  ...shape,
   id: "course-08",
   number: 8,
-  name: "Windmill and Tunnel",
+  name: "Switchback",
   environment: "garden",
   par: 4,
-  ballStart: [0, 0.25, 8],
-  hole: { position: [0, 0, -8], radius: 0.43 },
-  sections: [createRectangularFloor({ id: "main-floor", width: 6, length: 20, color: "#388d51" })],
-  walls: createPolygonWalls({ points }),
+
+  ballStart: [0, 0.25, 9],
+  hole: { position: [0, 0, -9], radius: 0.43 },
+
+  walls: [],
   surfaces: [],
   ramps: [],
-  obstacles: [
-    {
-      type: "windmill", position: [0, 0, 0],
-      towerWidth: 2.2, towerHeight: 4.8, towerDepth: 1.4,
-      openingWidth: 0.9, openingHeight: 0.85,
-      bladeLength: 2.7, bladeWidth: 0.22, bladeDepth: 0.12,
-      bladeCount: 4, axleHeight: 3.5,
-      phase: Math.PI / 4, speed: 1, direction: 1,
-      towerColor: "#b6a18c", roofColor: "#704c3b",
-      color: "#e8e1d5", hubColor: "#555555",
-    },
-    { type: "bumper", position: [-1.7, 0.4, -4], radius: 0.45, color: "#db8f52" },
-    { type: "bumper", position: [1.7, 0.4, -5.5], radius: 0.45, color: "#db8f52" },
+  obstacles: [],
 
-
-    {
-      type: "tunnel",
-      position: [0, 0.75, -4],
-      size: [2, 1.5, 5],
-
-      thickness: 0.15,
-      floor: false,
-
-      friction: 0.7,
-      color: "#586b76",
-    }
-
-
-
-  ],
+  terrain: {
+    width: 32,
+    length: 42,
+    resolution: 64,
+    baseHeight: 0,
+    defaultSurface: "grass",
+    color: GRASS_COLOR,
+    features: [
+      hill({
+        position: [-2.8, 3],
+        radius: 1.7,
+        height: 0.3
+      }),
+      valley({
+        position: [2, 0],
+        radius: 1.7,
+        depth: 0.22
+      }),
+    ],
+  },
 };
 
 export default course08;

@@ -1,60 +1,77 @@
 // src/courses/course12.js
-import { createRectangularFloor, createPolygonWalls } from "./courseBuilder";
+import { createCourseShape } from "./courseBuilder";
+import { ridge } from "./terrainPresets";
 
-const width = 8;
-const length = 24;
-const points = [
-  [-width / 2, -length / 2],
-  [width / 2, -length / 2],
-  [width / 2, length / 2],
-  [-width / 2, length / 2],
-];
+// COURSE 12 — SUMMIT STEPS
+// Multiple transverse ridges create uphill and downhill pace changes.
+
+const GRASS_COLOR = "#328b50";
+const WALL_STYLE = {
+  color: "#786b50", height: 0.55, thickness: 0.25,
+  friction: 0.8, restitution: 0.3,
+};
+
+const shape = createCourseShape({
+  type: "path",
+  points: [
+      [0, 9],
+      [0.4, 6],
+      [-1.7, 3],
+      [1.5, 0],
+      [-1.5, -3],
+      [0.7, -6],
+      [0, -9]
+    ],
+  width: 3.8,
+  curved: true,
+  color: GRASS_COLOR,
+  wall: WALL_STYLE,
+});
 
 const course12 = {
+  ...shape,
   id: "course-12",
   number: 12,
-  name: "Pendulum",
-  environment: "desert",
-  par: 5,
-  ballStart: [0, 0.25, 10],
-  hole: { position: [0, 0, -10], radius: 0.43 },
-  sections: [
-    createRectangularFloor({
-      id: "main-floor",
-      width,
-      length,
-      color: "#b99b68",
-    }),
-  ],
-  walls: createPolygonWalls({ points }),
+  name: "Summit Steps",
+  environment: "garden",
+  par: 4,
+
+  ballStart: [0, 0.25, 9],
+  hole: { position: [0, 0, -9], radius: 0.43 },
+
+  walls: [],
   surfaces: [],
   ramps: [],
-  obstacles: [
-    { type: "block", position: [-1.9, 0.4, 5], size: [3.4, 0.8, 0.45], color: "#8e674a" },
-    { type: "block", position: [1.9, 0.4, 0.5], size: [3.4, 0.8, 0.45], color: "#8e674a" },
-    { type: "block", position: [-1.9, 0.4, -4], size: [3.4, 0.8, 0.45], color: "#8e674a" },
-    { type: "bumper", position: [2.7, 0.4, -7.2], radius: 0.45, color: "#cf8752" },
+  obstacles: [],
 
-    {
-      type: "swingingPendulum",
-      position: [0, 2.2, 3],
-
-      length: 1.5,
-      bobRadius: 0.45,
-      rodRadius: 0.055,
-
-      amplitude: 0.6,
-      speed: 1.5,
-      axis: "x",
-
-      friction: 0.65,
-      restitution: 0.55,
-
-      color: "#ef4444",
-      rodColor: "#9ca3af",
-    },
-
-  ],
+  terrain: {
+    width: 32,
+    length: 42,
+    resolution: 96,
+    baseHeight: 0,
+    defaultSurface: "grass",
+    color: GRASS_COLOR,
+    features: [
+      ridge({
+        start: [-5, 5.0],
+        end: [5, 5.0],
+        width: 2.6,
+        height: 0.34
+      }),
+      ridge({
+        start: [-5, 0],
+        end: [5, 0],
+        width: 2.8,
+        height: 0.65
+      }),
+      ridge({
+        start: [-5, -5],
+        end: [5, -5],
+        width: 3.0,
+        height: 0.82
+      }),
+    ],
+  },
 };
 
 export default course12;

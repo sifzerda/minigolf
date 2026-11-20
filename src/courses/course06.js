@@ -1,87 +1,137 @@
 // src/courses/course06.js
 
-import {
-    createPolygonFloor,
-    createPolygonWalls,
-} from "./courseBuilder";
+import { createCourseShape } from "./courseBuilder";
+import { roundedPolygon } from "./coursePresets";
 
-const points = [
-    [-4, 10],
-    [2, 10],
-    [2, 4],
-    [4, 4],
-    [4, -3],
-    [1, -3],
-    [1, -10],
-    [-4, -10],
-    [-4, -5],
-    [-1, -5],
-    [-1, 2],
-    [-4, 2],
-];
+// ============================================================
+// COURSE 06 — MYSTERY TUNNELS
+// ============================================================
+
+const GRASS_COLOR = "#328b50";
+const WALL_COLOR = "#786b50";
+const BOX_COLOR = "#99968d";
+
+// ============================================================
+// COURSE GEOMETRY
+// ============================================================
+
+const OUTER = roundedPolygon(
+  [
+    [-4, -11],
+    [4, -11],
+    [5, -10],
+    [5, 10],
+    [4, 11],
+    [-4, 11],
+    [-5, 10],
+    [-5, -10],
+  ],
+  0.8,
+  6
+);
+
+const shape = createCourseShape({
+  type: "polygon",
+  points: OUTER,
+  color: GRASS_COLOR,
+});
+
+// ============================================================
+// COURSE DEFINITION
+// ============================================================
 
 const course06 = {
-    id: "course-06",
-    number: 6,
-    name: "Windmill",
-    environment: "garden",
-    par: 4,
+  ...shape,
 
-    ballStart: [0, 0.25, 8],
+  id: "course-06",
+  number: 6,
+  name: "Mystery Tunnels",
+  environment: "garden",
+  par: 2,
 
-    hole: {
-        position: [0, 0, -8],
-        radius: 0.43,
-    },
+  ballStart: [0, 0.25, 9],
 
-    sections: [
-        createPolygonFloor({
-            id: "main-floor",
-            points,
-            color: "#328b50",
-        }),
-    ],
+  hole: {
+    position: [0, 0, -4.2],
+    radius: 0.43,
+  },
 
-    walls: createPolygonWalls({ points }),
+  // ----------------------------------------------------------
+  // Boundaries
+  // ----------------------------------------------------------
 
-    surfaces: [],
-    ramps: [],
+  boundaryRings: [OUTER],
 
-    obstacles: [
-        // turnstile near the starting section.
+  wallStyle: {
+    color: WALL_COLOR,
+    height: 0.55,
+    thickness: 0.25,
+    friction: 0.8,
+    restitution: 0.3,
+  },
 
+  walls: [],
+  surfaces: [],
+  ramps: [],
+
+  // ----------------------------------------------------------
+  // Mystery tunnel box
+  // ----------------------------------------------------------
+
+  obstacles: [
+    {
+      id: "mystery-tunnels",
+      type: "mysteryTunnels",
+
+      position: [0, 0, 0],
+
+      size: [10, 2.4, 7],
+
+      openingWidth: 1.35,
+      openingHeight: 1.15,
+
+      color: BOX_COLOR,
+
+      friction: 0.8,
+      restitution: 0.25,
+
+      exits: [
+        // Left exit
         {
-            type: "windmill",
-            position: [0, 0, 6],
-
-            towerWidth: 2.2,
-            towerHeight: 4.8,
-            towerDepth: 1.4,
-
-            openingWidth: 0.9,
-            openingHeight: 0.85,
-
-            bladeLength: 2.7,
-            bladeWidth: 0.22,
-            bladeDepth: 0.12,
-            bladeCount: 4,
-
-            axleHeight: 3.5,
-            phase: Math.PI / 4,
-            speed: 1,
-            direction: 1,
-
-            towerColor: "#b6a18c",
-            roofColor: "#704c3b",
-            color: "#e8e1d5",
-            hubColor: "#555555",
+          position: [-3, 0.26, -3.8],
+          velocity: [0, 0, -2.5],
         },
 
+        // Centre exit — directly into the cup
+        {
+          position: [0, 0.28, -4.2],
+          velocity: [0, -0.35, 0],
+        },
 
+        // Right exit
+        {
+          position: [3, 0.26, -3.8],
+          velocity: [0, 0, -2.5],
+        },
+      ],
+    },
+  ],
 
+  // ----------------------------------------------------------
+  // Terrain
+  // ----------------------------------------------------------
 
-    ],
+  terrain: {
+    width: 30,
+    length: 40,
+    resolution: 64,
+
+    baseHeight: 0,
+    defaultSurface: "grass",
+    color: GRASS_COLOR,
+
+    features: [],
+  },
 };
 
 export default course06;
-

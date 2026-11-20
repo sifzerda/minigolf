@@ -12,14 +12,9 @@ export default function ShotPowerMeter() {
   const power = useGameStore((s) => s.power);
   const charging = useGameStore((s) => s.charging);
   const chargeMode = useGameStore((s) => s.chargeMode);
-
   const percent = Math.round(power * 100);
   const color = getPowerColor(power);
-
-  const chargingLabel =
-    chargeMode === "jump"
-      ? "CHARGING JUMP SHOT"
-      : "CHARGING NORMAL SHOT";
+  const chargingLabel = chargeMode === "jump" ? "CHARGING JUMP SHOT" : "CHARGING NORMAL SHOT";
 
   return (
     <div className="w-full max-w-80 rounded-2xl border border-[#a3ff12]/20 bg-black/40 p-3.5">
@@ -29,29 +24,22 @@ export default function ShotPowerMeter() {
           {charging ? chargingLabel : "SHOT POWER"}
         </span>
 
-        <strong
-          className="text-xl font-bold tabular-nums"
-          style={{ color }}
-        >
-          {percent}%
-        </strong>
+        <strong className="text-xl font-bold tabular-nums" style={{ color }}>{percent}%</strong>
       </div>
 
       {/* Power bar */}
       <div
-        className="relative h-[18px] overflow-hidden rounded-lg border border-white/15 bg-[#17231b]"
+        className="relative h-4.5 overflow-hidden rounded-lg border border-white/15 bg-[#17231b]"
         role="progressbar"
         aria-label="Shot power"
         aria-valuemin={10}
         aria-valuemax={100}
         aria-valuenow={percent}
-      >
+        >
         {/* Power fill */}
         <div
           className={`h-full rounded-[inherit] transition-[width,background-color] duration-75 ease-linear ${
-            charging
-              ? "motion-safe:animate-pulse"
-              : ""
+            charging ? "motion-safe:animate-pulse" : ""
           }`}
           style={{
             width: `${percent}%`,

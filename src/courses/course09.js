@@ -1,82 +1,89 @@
 // src/courses/course09.js
 
-import { createRectangularFloor, createPolygonWalls } from "./courseBuilder";
+import { createCourseShape } from "./courseBuilder";
+import { roundedPolygon } from "./coursePresets";
+import { hill, valley } from "./terrainPresets";
 
-const points = [[-4, -12], [4, -12], [4, 12], [-4, 12]];
+// COURSE 09 — DUNE RUN
+// Three sand bunkers placed to punish the obvious straight shots.
+
+const GRASS_COLOR = "#328b50";
+const WALL_STYLE = {
+  color: "#786b50", height: 0.55, thickness: 0.25,
+  friction: 0.8, restitution: 0.3,
+};
+
+const OUTER = roundedPolygon(
+  [
+      [-4.5, 11],
+      [4.5, 11],
+      [5, 9],
+      [4.7, 3],
+      [5, -3],
+      [4.7, -9],
+      [4, -11],
+      [-4, -11],
+      [-4.7, -9],
+      [-5, -3],
+      [-4.7, 3],
+      [-5, 9]
+    ],
+  0.65,
+  6
+);
+
+const shape = createCourseShape({
+  type: "polygon",
+  points: OUTER,
+  color: GRASS_COLOR,
+  wall: WALL_STYLE,
+});
 
 const course09 = {
+  ...shape,
   id: "course-09",
   number: 9,
-  name: "Bridge and ramp",
+  name: "Dune Run",
   environment: "garden",
-  par: 5,
-  ballStart: [0, 0.25, 10],
-  hole: { position: [0, 0, -10], radius: 0.43 },
-  sections: [createRectangularFloor({ id: "main-floor", width: 8, length: 24, color: "#378956" })],
-  walls: createPolygonWalls({ points }),
-  surfaces: [],
-  ramps: [],
-  obstacles: [
-    {
-      type: "waterHazard", position: [-2.6, -0.15, 1],
-      size: [2, 0.3, 4], color: "#1486b3", respawnPosition: [0, 0.5, 5],
-    },
-    {
-      type: "waterHazard", position: [2.6, -0.15, -3],
-      size: [2, 0.3, 4], color: "#1486b3", respawnPosition: [0, 0.5, 0],
-    },
-    { type: "block", position: [0, 0.35, 2], size: [1.5, 0.7, 0.7], color: "#7b6b57" },
-    { type: "bumper", position: [-1.5, 0.4, -6], radius: 0.45, color: "#e6bb72" },
-    { type: "bumper", position: [1.5, 0.4, -7], radius: 0.45, color: "#e6bb72" },
- 
+  par: 4,
 
-{
-  type: "bridge",
-  position: [0, 0.75, -5],
-  size: [1.25, 0.125, 3],
+  ballStart: [0, 0.25, 9],
+  hole: { position: [0, 0, -9], radius: 0.43 },
 
-  rails: true,
-  railHeight: 0.25,
-  railThickness: 0.06,
-
-  ramps: true,
-  rampLength: 2,
-  rampThickness: 0.1,
-  groundY: 0,
-
-  friction: 0.8,
-  color: "#80664c",
-  railColor: "#4a3829",
-},
-
-
-
-{
-  type: "elevatedPath",
-  position: [4, 1, -6],
-  size: [1, 0.1, 4],
-
-  supports: true,
-  supportHeight: 0.75,
-  supportWidth: 0.15,
-
-  rails: true,
-  railHeight: 0.25,
-  railThickness: 0.06,
-
-  ramps: true,
-  rampLength: 2,
-  rampThickness: 0.1,
-  groundY: 0,
-
-  friction: 0.8,
-  color: "#6b7c86",
-},
-
-
- 
- 
+  walls: [],
+  surfaces: [
+    { id: "sand-1", surface: "sand", position: [-1.4, 0, 6.2], size: [3.3, 2.2], color: "#d8bc7a" },
+    { id: "sand-2", surface: "sand", position: [1.5, 0, 1.3], size: [3.4, 2.6], color: "#d8bc7a" },
+    { id: "sand-3", surface: "sand", position: [-1.7, 0, -4.2], size: [3, 2.4], color: "#d8bc7a" },
   ],
+  ramps: [],
+  obstacles: [],
+
+  terrain: {
+    width: 32,
+    length: 42,
+    resolution: 64,
+    baseHeight: 0,
+    defaultSurface: "grass",
+    color: GRASS_COLOR,
+    features: [
+      hill({
+        position: [-2.4, 5.5],
+        radius: 2.5,
+        height: 0.35
+      }),
+      hill({
+        position: [2, -2],
+        radius: 2.9,
+        height: 0.4
+      }),
+      valley({
+        position: [-1, -5],
+        radius: 2.2,
+        depth: 0.25
+      }),
+    ],
+  },
 };
 
 export default course09;

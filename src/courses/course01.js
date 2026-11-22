@@ -40,7 +40,8 @@ const course01 = {
       [-4, -9],
     ],
 
-    samples: 5,
+    tolerance: 0.025,
+    maxSegmentLength: 0.5,
   }),
 
   surfaces: [],

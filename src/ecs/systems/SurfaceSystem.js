@@ -77,7 +77,7 @@ function containsRectangle(entity, position, isRamp = false) {
   }
 
   // Account for Y-axis rotation on ramps.
-  const angle = isRamp ? entity.angle ?? 0 : 0;
+  const angle = entity.rotation?.[1] ?? 0;
 
   const dx = position.x - x;
   const dz = position.z - z;
@@ -108,7 +108,7 @@ function resolveRollingSurface(surface) {
   if (!surface) return "grass";
 
   const config = PHYSICS.surfaces[surface];
-  
+
   if (!config || config.hazard) {
     return "grass";
   }

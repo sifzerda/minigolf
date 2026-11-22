@@ -45,7 +45,7 @@ export function setupGame(course) {
     id: `${course.id}-ball`,
     ball: true,
     position: ballPosition,
-    radius: 0.25,
+    radius: BALL_RADIUS,
   });
 
 
@@ -57,14 +57,18 @@ export function setupGame(course) {
   });
 
 
-  (course.surfaces ?? []).forEach(
-    (surface, index) => {
-      world.add({
-        ...surface,
-        id: `${course.id}-surface-${index}`,
-      });
-    }
-  );
+  for (const [index, surface] of
+    (course.surfaces ?? []).entries()) {
+
+    world.add({
+      ...surface,
+      surface:
+        surface.surface ??
+        surface.type ??
+        "grass",
+      id: `${course.id}-surface-${surface.id ?? index}`,
+    });
+  }
 
   (course.ramps ?? []).forEach(
     (ramp, index) => {

@@ -81,7 +81,7 @@ const useGameStore = create(
         set((state) =>
           state.shotRequest?.id === id
             ? { shotRequest: null }
-            : {}
+            : state
         ),
 
       setPower: (power) =>

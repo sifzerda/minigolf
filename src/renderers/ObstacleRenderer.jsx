@@ -15,6 +15,8 @@ import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
 import { VerticalLoop, HorizontalLoop, InclinedLoop } from "./LoopObstacle";
 import CavernRenderer from "./CavernRenderer";
+import { buildStaticAssembly } from "../courses/bricks";
+import BrickAssemblyRenderer from "./BrickAssemblyRenderer";
 
 const halfSize = (size) => size.map((value) => value / 2);
 
@@ -266,118 +268,17 @@ function ConveyorBelt({ entity, paused = false, ballRef }) {
   );
 }
 
-
-// Reusable static collider and matching visible geometry.
-function StaticPart({ part, friction = 0.8, restitution = 0.1 }) {
-  return (
-    <group
-      position={part.position ?? [0, 0, 0]}
-      rotation={part.rotation ?? [0, 0, 0]}
-    >
-      <CuboidCollider
-        args={halfSize(part.size)}
-        friction={friction}
-        restitution={restitution}
-      />
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={part.size} />
-        <meshStandardMaterial
-          color={part.color}
-          roughness={part.roughness ?? 0.8}
-          metalness={part.metalness ?? 0.05}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-// A deck's center is at local y=0. Its top is at thickness/2.
-// Optional approach ramps meet that top and descend toward groundY.
-function makeAccessRamps({
-  width, thickness, length, centerY, groundY, rampLength,
-  rampThickness, color,
-}) {
-  if (rampLength <= 0) return [];
-  const topY = centerY + thickness / 2;
-  const rise = topY - groundY;
-  if (rise <= 0.001) return [];
-  const angle = Math.atan2(rise, rampLength);
-  const slopedLength = Math.hypot(rampLength, rise);
-  const centerLocalY = (groundY + topY) / 2 - centerY -
-    (rampThickness / 2) * Math.cos(angle);
-  const centerZ = (length + rampLength) / 2;
-  return [-1, 1].map((side) => ({
-    id: `approach-${side}`,
-    position: [0, centerLocalY, side * centerZ],
-    rotation: [side * angle, 0, 0],
-    size: [width, rampThickness, slopedLength],
-    color,
-  }));
-}
-
-function Tunnel({ entity }) {
-  const [width, height, length] = entity.size ?? [2, 1.5, 5];
-  const thickness = Math.max(
-    0.04,
-    Math.min(entity.thickness ?? 0.15, width / 4, height / 4)
-  );
-  const color = entity.color ?? "#586b76";
-  // Most courses already have a playable floor beneath the tunnel.
-  // Use floor:true only for tunnels spanning a gap.
-  const hasFloor = entity.floor === true;
-  const parts = [
-    {
-      id: "roof", position: [0, height / 2 - thickness / 2, 0],
-      size: [width, thickness, length], color,
-    },
-    {
-      id: "left", position: [-width / 2 + thickness / 2, 0, 0],
-      size: [thickness, height, length], color,
-    },
-    {
-      id: "right", position: [width / 2 - thickness / 2, 0, 0],
-      size: [thickness, height, length], color,
-    },
-  ];
-  if (hasFloor) {
-    parts.push({
-      id: "floor", position: [0, -height / 2 + thickness / 2, 0],
-      size: [width, thickness, length], color: entity.floorColor ?? color,
-    });
-  }
-  return (
-    <RigidBody type="fixed" colliders={false}
-      position={entity.position}
-      rotation={entity.rotation ?? [0, 0, 0]}
-    >
-      {parts.map((part) => (
-        <StaticPart key={part.id} part={part}
-          friction={entity.friction ?? 0.7}
-          restitution={entity.restitution ?? 0.1} />
-      ))}
-    </RigidBody>
-  );
-}
-
 function Pipe({ entity }) {
+  
   const radius = entity.radius ?? 0.8;
   const length = entity.length ?? 5;
   const thickness = entity.thickness ?? 0.12;
-  const segments = Math.max(
-    8,
-    Math.floor(entity.segments ?? 16)
-  );
-
+  const segments = Math.max(8, Math.floor(entity.segments ?? 16));
   const color = entity.color ?? "#647d88";
-
   const innerRadius = radius;
   const outerRadius = radius + thickness;
-  const centerRadius =
-    (innerRadius + outerRadius) / 2;
-
-  const segmentWidth =
-    2 * centerRadius * Math.tan(Math.PI / segments) +
-    0.01;
+  const centerRadius = (innerRadius + outerRadius) / 2;
+  const segmentWidth = 2 * centerRadius * Math.tan(Math.PI / segments) + 0.01;
 
   return (
     <RigidBody
@@ -427,110 +328,6 @@ function Pipe({ entity }) {
           </group>
         );
       })}
-    </RigidBody>
-  );
-}
-
-function Bridge({ entity }) {
-  const [width, thickness, length] = entity.size ?? [3, 0.25, 6];
-  const railHeight = entity.railHeight ?? 0.5;
-  const railThickness = Math.min(entity.railThickness ?? 0.12, width / 4);
-  const color = entity.color ?? "#80664c";
-  const railColor = entity.railColor ?? "#4a3829";
-  const parts = [{
-    id: "deck", position: [0, 0, 0], size: [width, thickness, length], color,
-  }];
-  if (entity.rails !== false) {
-    const railY = thickness / 2 + railHeight / 2;
-    const railX = width / 2 - railThickness / 2;
-    for (const side of [-1, 1]) {
-      parts.push({
-        id: `rail-${side}`, position: [side * railX, railY, 0],
-        size: [railThickness, railHeight, length], color: railColor,
-      });
-    }
-  }
-  // ramps:true creates two access ramps. Existing bridges are unchanged
-  // unless the new option is explicitly enabled.
-  if (entity.ramps === true) {
-    parts.push(...makeAccessRamps({
-      width: entity.rampWidth ?? width,
-      thickness, length,
-      centerY: entity.position[1],
-      groundY: entity.groundY ?? 0,
-      rampLength: entity.rampLength ?? 3,
-      rampThickness: entity.rampThickness ?? 0.2,
-      color: entity.rampColor ?? color,
-    }));
-  }
-  return (
-    <RigidBody type="fixed" colliders={false}
-      position={entity.position}
-      rotation={entity.rotation ?? [0, 0, 0]}
-    >
-      {parts.map((part) => (
-        <StaticPart key={part.id} part={part}
-          friction={entity.friction ?? 0.8}
-          restitution={entity.restitution ?? 0.1} />
-      ))}
-    </RigidBody>
-  );
-}
-
-function ElevatedPath({ entity }) {
-  const [width, thickness, length] = entity.size ?? [2, 0.2, 8];
-  const color = entity.color ?? "#6b7c86";
-  const parts = [{
-    id: "walkway", position: [0, 0, 0],
-    size: [width, thickness, length], color,
-  }];
-  if (entity.supports !== false) {
-    const supportHeight = Math.max(0, entity.supportHeight ?? 1.5);
-    const supportWidth = Math.min(width * 0.3, entity.supportWidth ?? 0.3);
-    if (supportHeight > 0) {
-      const y = -thickness / 2 - supportHeight / 2;
-      const z = length / 2 - supportWidth;
-      for (const side of [-1, 1]) {
-        parts.push({
-          id: `support-${side}`, position: [0, y, side * z],
-          size: [supportWidth, supportHeight, supportWidth], color,
-        });
-      }
-    }
-  }
-  if (entity.rails === true) {
-    const railHeight = entity.railHeight ?? 0.5;
-    const railThickness = Math.min(entity.railThickness ?? 0.12, width / 4);
-    for (const side of [-1, 1]) {
-      parts.push({
-        id: `rail-${side}`,
-        position: [side * (width / 2 - railThickness / 2),
-          thickness / 2 + railHeight / 2, 0],
-        size: [railThickness, railHeight, length],
-        color: entity.railColor ?? color,
-      });
-    }
-  }
-  if (entity.ramps === true) {
-    parts.push(...makeAccessRamps({
-      width: entity.rampWidth ?? width, thickness, length,
-      centerY: entity.position[1],
-      groundY: entity.groundY ?? 0,
-      rampLength: entity.rampLength ?? 3,
-      rampThickness: entity.rampThickness ?? 0.2,
-      color: entity.rampColor ?? color,
-    }));
-  }
-  return (
-    <RigidBody type="fixed" colliders={false}
-      position={entity.position}
-      rotation={entity.rotation ?? [0, 0, 0]}
-    >
-      {parts.map((part) => (
-        <StaticPart key={part.id} part={part}
-          friction={entity.friction ?? 0.8}
-          restitution={entity.restitution ?? 0.1} />
-      ))}
     </RigidBody>
   );
 }
@@ -871,8 +668,8 @@ function Windmill({ entity, paused = false }) {
           <coneGeometry
             args={[
               Math.SQRT2 *
-                Math.max(towerWidth, towerDepth) *
-                0.55,
+              Math.max(towerWidth, towerDepth) *
+              0.55,
               1,
               4,
             ]}
@@ -1244,28 +1041,47 @@ function SwingingPendulum({ entity, paused = false }) {
   );
 }
 
+function StaticAssemblyObstacle({ entity }) {
+  const built = useMemo(
+    () => buildStaticAssembly(entity),
+    [entity]
+  );
+
+  return <BrickAssemblyRenderer entity={built} />;
+}
+
 const OBSTACLE_COMPONENTS = {
-  bumper: Bumper,
+  brickAssembly: BrickAssemblyRenderer,
+
   block: Block,
-  movingBarrier: MovingBarrier,
-  turnstile: Turnstile,
-  windmill: Windmill,
-  movingPlatform: MovingPlatform,
-  conveyorBelt: ConveyorBelt,
-  tunnel: Tunnel,
-  funnel: Funnel,
-  swingingPendulum: SwingingPendulum,
-  verticalLoop: VerticalLoop,
-  horizontalLoop: HorizontalLoop,
-  inclinedLoop: InclinedLoop,
-  pipe: Pipe,
-  bridge: Bridge,
-  elevatedPath: ElevatedPath,
-  waterHazard: WaterHazard,
+  bridge: StaticAssemblyObstacle,
+  tunnel: StaticAssemblyObstacle,
+  elevatedPath: StaticAssemblyObstacle,
+
+  // Basic obstacles
+  bumper: Bumper,
   plateau: Plateau,
   cliff: Cliff,
   ledge: Ledge,
+
+  // Moving obstacles
+  movingBarrier: MovingBarrier,
+  movingPlatform: MovingPlatform,
+  conveyorBelt: ConveyorBelt,
+  turnstile: Turnstile,
+  windmill: Windmill,
+  swingingPendulum: SwingingPendulum,
+
+  // Specialised geometry
+  pipe: Pipe,
+  funnel: Funnel,
+  verticalLoop: VerticalLoop,
+  horizontalLoop: HorizontalLoop,
+  inclinedLoop: InclinedLoop,
   cavern: CavernRenderer,
+
+  // Hazards
+  waterHazard: WaterHazard,
 };
 
 export default function ObstacleRenderer({ entity, ballRef, paused = false }) {

@@ -1,3 +1,4 @@
+// src/terrain/loopTrack.js
 import { Vector3 } from "three";
 import { BALL_RADIUS } from "../ecs/constants/physics.js";
 

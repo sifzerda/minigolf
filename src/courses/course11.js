@@ -2,6 +2,14 @@
 
 import { createCourseShape } from "./courseBuilder";
 import { hill, valley } from "./terrainPresets";
+import {
+  brick,
+  assembly,
+  bridge,
+  tunnel,
+  elevatedPath,
+  repeat,
+} from "./bricks";
 
 // COURSE 11 — TWO WAYS
 // Two alternate routes with different hazards meet at the cup.
@@ -61,7 +69,53 @@ const course11 = {
     { id: "sand-2", surface: "sand", position: [2.4, 0, -2], size: [2, 2.8], color: "#d8bc7a" },
   ],
   ramps: [],
-  obstacles: [],
+
+  obstacles: [
+
+  bridge({
+    position: [0, 1, -5],
+    size: [3, 0.25, 6],
+    rails: true,
+    ramps: true,
+  }),
+
+    tunnel({
+    position: [0, 0.75, 0],
+    size: [2.5, 1.5, 4],
+    thickness: 0.2,
+    color: "#586b76",
+  }),
+
+    elevatedPath({
+    position: [0, 1.5, -9],
+    size: [2, 0.2, 8],
+    rails: true,
+    supports: true,
+    ramps: true,
+  }),
+
+  assembly({
+    position: [0, 0, 5],
+
+        parts: [
+      brick.box(
+        [4, 0.3, 2],
+        [0, 0.15, 0],
+        { color: "#8a7968" }
+      ),
+
+            ...repeat(3, (i) =>
+        brick.pyramid(
+          [0.7, 0.8, 0.7],
+          [(i - 1) * 1.3, 0.7, 0],
+          { color: "#db9248" }
+        )
+      ),
+    ],
+
+  }),
+
+  ],
 
   terrain: {
     width: 32,

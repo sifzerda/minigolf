@@ -370,7 +370,7 @@ export default function GolfGame() {
 
             {!completed && !gameComplete && (
                 <Canvas
-                    frameloop="always"
+                    frameloop="demand"
                     shadows="soft"
                     dpr={[1, 1.25]}
                     gl={{

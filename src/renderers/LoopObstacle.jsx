@@ -1,3 +1,4 @@
+// src/renderers/LoopObstacle.jsx
 import { useEffect, useMemo } from "react";
 import { BufferGeometry, Float32BufferAttribute, DoubleSide, Vector3 } from "three";
 import { RigidBody, TrimeshCollider } from "@react-three/rapier";

@@ -153,3 +153,9 @@ This project is incomplete and requires further development. Currently the highs
 
     - Once all maps are finished, use screenshots of courses 
     rather than using coursemap renderer
+
+
+
+
+
+    - [ ] Change some environments: neon dark/UV, jungle, swamp, industrial/factory, cave, urban, spooky/halloween, christmas, gnome flamingo garden poolside, birthday party, construction yard, ...

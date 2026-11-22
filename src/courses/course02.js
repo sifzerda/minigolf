@@ -61,7 +61,8 @@ const course02 = {
       [-4.8, 9],
     ],
 
-    samples: 6,
+    tolerance: 0.025,
+    maxSegmentLength: 0.5,
 
     // Asymmetric central island creates two
     // different routes around the obstruction.

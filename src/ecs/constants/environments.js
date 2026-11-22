@@ -10,6 +10,7 @@ export const ENVIRONMENTS = {
     ambient: 1.2,
     sun: 2.2,
     decorations: "trees",
+    flagColor: "#ff4545",
   },
 
   desert: {
@@ -21,6 +22,7 @@ export const ENVIRONMENTS = {
     ambient: 1.4,
     sun: 2.6,
     decorations: "cactus",
+    flagColor: "#ff9f1c"
   },
 
   snow: {
@@ -32,6 +34,7 @@ export const ENVIRONMENTS = {
     ambient: 1.6,
     sun: 1.8,
     decorations: "pine",
+    flagColor: "#0088ff"
   },
 
   volcanic: {
@@ -43,6 +46,7 @@ export const ENVIRONMENTS = {
     ambient: 0.65,
     sun: 1.4,
     decorations: "rocks",
+    flagColor: "#ff5500"
   },
 
   neon: {
@@ -54,6 +58,7 @@ export const ENVIRONMENTS = {
     ambient: 0.8,
     sun: 1.2,
     decorations: "crystals",
+    flagColor: "#CFFF04"  
   },
 };
 

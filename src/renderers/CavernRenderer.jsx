@@ -1,3 +1,5 @@
+// src/renderers/CavernRenderer.jsx
+
 import { useEffect, useMemo } from "react";
 import { RigidBody, TrimeshCollider, BallCollider } from "@react-three/rapier";
 import { BufferGeometry, Float32BufferAttribute, DoubleSide, Euler, Vector3 } from "three";

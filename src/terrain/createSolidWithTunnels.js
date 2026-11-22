@@ -1,3 +1,4 @@
+// src/terrain/createSolidWithTunnels.js
 import {
   BoxGeometry,
   CylinderGeometry,

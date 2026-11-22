@@ -1,5 +1,7 @@
 // src/terrain/WaterBasinBuilder.js
 
+// Water cutouts, basin walls and bottoms
+
 import * as THREE from "three";
 import polygonClipping from "polygon-clipping";
 

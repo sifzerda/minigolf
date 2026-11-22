@@ -1,19 +1,44 @@
 // src/courses/coursePresets.js
 
 import { createCourseShape } from "./courseBuilder";
+import { createLayoutTemplate } from "./layoutCourse.js";
 
 const EPS = 1e-6;
 const DEFAULT_GRASS = "#328b50";
 
+// default preset
+
+export const createGardenLayout =
+  createLayoutTemplate({
+    environment: "garden",
+    par: 3,
+    width: 4.5,
+    curved: true,
+
+    terrain: {
+      width: 35,
+      length: 45,
+      resolution: 64,
+      baseHeight: 0,
+      defaultSurface: "grass",
+    },
+
+    shapeOptions: {
+      color: "#328b50",
+      friction: 0.85,
+
+      wall: {
+        height: 0.55,
+        thickness: 0.25,
+        color: "#80664c",
+      },
+    },
+  });
 // ============================================================
 // POLYGON HELPERS
 // ============================================================
 
-export function roundedPolygon(
-  points,
-  radius = 0.5,
-  steps = 6
-) {
+export function roundedPolygon(points, radius = 0.5, steps = 6) {
   if (!Array.isArray(points) || points.length < 3) {
     return [];
   }

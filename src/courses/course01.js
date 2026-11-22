@@ -1,6 +1,7 @@
 // src/courses/course01.js
 
-import { createCourseShape } from "./courseBuilder";
+import { createLayoutCourse } from "./layoutCourse.js";
+import { terrainBrick } from "./terrainBricks.js";
 
 // ============================================================
 // COURSE 01 — SMALL HILL
@@ -8,14 +9,16 @@ import { createCourseShape } from "./courseBuilder";
 
 const GRASS_COLOR = "#328b50";
 
-// ============================================================
-
-const course01 = {
+const course01 = createLayoutCourse({
   id: "course-01",
   number: 1,
   name: "Small Hill",
   environment: "garden",
   par: 2,
+
+  // ----------------------------------------------------------
+  // START AND HOLE
+  // ----------------------------------------------------------
 
   ballStart: [0, 0.25, 8],
 
@@ -24,7 +27,11 @@ const course01 = {
     radius: 0.43,
   },
 
-  ...createCourseShape({
+  // ----------------------------------------------------------
+  // PLAYABLE COURSE SHAPE
+  // ----------------------------------------------------------
+
+  shape: {
     type: "rounded",
 
     points: [
@@ -42,11 +49,12 @@ const course01 = {
 
     tolerance: 0.025,
     maxSegmentLength: 0.5,
-  }),
+    color: GRASS_COLOR,
+  },
 
-  surfaces: [],
-  ramps: [],
-  obstacles: [],
+  // ----------------------------------------------------------
+  // TERRAIN CONFIGURATION
+  // ----------------------------------------------------------
 
   terrain: {
     width: 30,
@@ -54,17 +62,28 @@ const course01 = {
     resolution: 64,
     baseHeight: -0.15,
     color: GRASS_COLOR,
+  },
 
+  // ----------------------------------------------------------
+  // NATURAL GEOGRAPHY
+  // ----------------------------------------------------------
+
+  geography: {
     features: [
-      {
-        type: "ridge",
+      terrainBrick.ridge({
         start: [-4, 0],
         end: [4, 0],
         width: 4,
         height: 0.9,
-      },
+      }),
     ],
   },
-};
+
+  // ----------------------------------------------------------
+  // DEVELOPMENT VALIDATION
+  // ----------------------------------------------------------
+
+  validate: import.meta.env.DEV,
+});
 
 export default course01;

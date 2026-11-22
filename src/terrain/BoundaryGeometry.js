@@ -3,6 +3,7 @@
 import * as THREE from "three";
 
 // Geometry builders extracted without changing their algorithms.
+// 	Terrain-conforming walls
 
 function createConformingWallGeometry(
   wall,

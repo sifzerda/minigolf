@@ -14,9 +14,11 @@ import useGameStore from "../store/useGameStore";
 import { resetBall } from "../ecs/systems/ShotSystem";
 import WaterSplash from "./WaterSplash";
 import { VerticalLoop, HorizontalLoop, InclinedLoop } from "./LoopObstacle";
-import CavernRenderer from "./CavernRenderer";
 import { buildStaticAssembly } from "../courses/bricks";
 import BrickAssemblyRenderer from "./BrickAssemblyRenderer";
+import {
+  geometryToTrimeshData,
+} from "../terrain/trimeshUtils.js";
 
 const halfSize = (size) => size.map((value) => value / 2);
 
@@ -269,7 +271,7 @@ function ConveyorBelt({ entity, paused = false, ballRef }) {
 }
 
 function Pipe({ entity }) {
-  
+
   const radius = entity.radius ?? 0.8;
   const length = entity.length ?? 5;
   const thickness = entity.thickness ?? 0.12;
@@ -946,10 +948,10 @@ function Funnel({ entity }) {
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const collider = useMemo(() => [
-    new Float32Array(geometry.getAttribute("position").array),
-    new Uint32Array(geometry.index.array),
-  ], [geometry]);
+  const collider = useMemo(
+    () => geometryToTrimeshData(geometry),
+    [geometry]
+  );
 
   return (
     <RigidBody
@@ -1051,7 +1053,7 @@ function StaticAssemblyObstacle({ entity }) {
 }
 
 const OBSTACLE_COMPONENTS = {
-  brickAssembly: BrickAssemblyRenderer,
+  assembly: BrickAssemblyRenderer,
 
   block: Block,
   bridge: StaticAssemblyObstacle,
@@ -1078,7 +1080,6 @@ const OBSTACLE_COMPONENTS = {
   verticalLoop: VerticalLoop,
   horizontalLoop: HorizontalLoop,
   inclinedLoop: InclinedLoop,
-  cavern: CavernRenderer,
 
   // Hazards
   waterHazard: WaterHazard,

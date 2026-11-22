@@ -160,7 +160,7 @@ export function sampleTerrainSpline(x, z, spline) {
     height:
       startHeight +
       (endHeight - startHeight) *
-        sample.progress,
+      sample.progress,
   };
 }
 
@@ -209,7 +209,7 @@ export function getFairwayInfluence(
 
   const t = clamp(
     (distance - halfWidth) /
-      Math.max(EPSILON, sampler.shoulder),
+    Math.max(EPSILON, sampler.shoulder),
     0,
     1
   );
@@ -317,6 +317,15 @@ function distanceToSegment(
 // ============================================================
 
 const FEATURE_GENERATORS = {
+
+  fairway(x, z, feature, sampler) {
+    return getFairwayInfluence(
+      x,
+      z,
+      sampler
+    );
+  },
+
   hill(x, z, feature) {
     return radialDeformation(
       x,
@@ -557,9 +566,12 @@ export function prepareTerrainFeatures(terrain) {
       generator:
         FEATURE_GENERATORS[feature.type],
 
-      spline: SPLINE_TYPES.has(feature.type)
-        ? createTerrainSpline(feature)
-        : null,
+      spline:
+        feature.type === "fairway"
+          ? createFairwaySampler(feature)
+          : SPLINE_TYPES.has(feature.type)
+            ? createTerrainSpline(feature)
+            : null,
     })
   );
 }
@@ -817,7 +829,7 @@ export function alignPositionToCourse(
   return [
     x,
     getCourseHeight(x, z, terrain) +
-      offsetY,
+    offsetY,
     z,
   ];
 }

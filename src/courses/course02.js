@@ -1,35 +1,39 @@
 // src/courses/course02.js
 
-import { createCourseShape } from "./courseBuilder";
+import { createLayoutCourse } from "./layoutCourse.js";
+import { surfaceBrick } from "./terrainBricks.js";
 
 // ============================================================
-// COURSE 02 — Sand Fork
+// COURSE 02 — SAND FORK
 // ============================================================
 
 const GRASS_COLOR = "#328b50";
 const WALL_COLOR = "#806d55";
 const SAND_COLOR = "#d8bc7a";
 
-// ------------------------------------------------------------
-
-const course02 = {
+const course02 = createLayoutCourse({
   id: "course-02",
   number: 2,
   name: "Sand Fork",
   environment: "garden",
   par: 3,
 
-  // Starting position
+  // ----------------------------------------------------------
+  // START AND HOLE
+  // ----------------------------------------------------------
+
   ballStart: [0, 0.25, 8],
 
-  // Target
   hole: {
     position: [0, 0, -8],
     radius: 0.43,
   },
 
-  // Main S-shaped course
-  ...createCourseShape({
+  // ----------------------------------------------------------
+  // PLAYABLE COURSE SHAPE
+  // ----------------------------------------------------------
+
+  shape: {
     type: "rounded",
 
     points: [
@@ -64,11 +68,12 @@ const course02 = {
     tolerance: 0.025,
     maxSegmentLength: 0.5,
 
-    // Asymmetric central island creates two
-    // different routes around the obstruction.
+    // Asymmetric island separates the playable
+    // floor into two possible routes.
     holes: [
       {
         type: "polygon",
+
         points: [
           [-0.2, 3.5],
           [0.9, 3.2],
@@ -93,42 +98,48 @@ const course02 = {
       height: 0.65,
       thickness: 0.25,
     },
-  }),
+  },
 
-  // Desert sand hazards
+  // ----------------------------------------------------------
+  // SURFACE HAZARDS
+  // ----------------------------------------------------------
+
   surfaces: [
     // Upper-right sand bunker
-    {
+    surfaceBrick.patch({
+      id: "upper-right-sand",
       surface: "sand",
       position: [2.6, 0, 6],
       size: [3, 3.8],
       color: SAND_COLOR,
-    },
+    }),
 
     // Lower-left sand bunker
-    {
+    surfaceBrick.patch({
+      id: "lower-left-sand",
       surface: "sand",
       position: [-3.2, 0, -5.7],
       size: [3, 3],
       color: SAND_COLOR,
-    },
+    }),
   ],
 
-  // No ramps: this course focuses on
-  // directional control and banking.
-  ramps: [],
-
-  // Keep the course relatively simple
-  // for the second level.
-  obstacles: [],
+  // ----------------------------------------------------------
+  // TERRAIN
+  // ----------------------------------------------------------
 
   terrain: {
     width: 30,
     length: 40,
     resolution: 64,
     baseHeight: -0.15,
-    features: [],
   },
-};
+
+  // ----------------------------------------------------------
+  // DEVELOPMENT VALIDATION
+  // ----------------------------------------------------------
+
+  validate: import.meta.env.DEV,
+});
 
 export default course02;

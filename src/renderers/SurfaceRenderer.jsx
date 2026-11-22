@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
-
+import {
+  geometryToTrimeshData,
+} from "../terrain/trimeshUtils.js";
 import * as THREE from "three";
 
 import {
@@ -27,31 +29,6 @@ import WaterSplash from "./WaterSplash.jsx";
 const DEFAULT_WATER = "#1479a8";
 const BASIN_COLOR = "#52636a";
 const EPSILON = 1e-5;
-
-function getColliderData(geometry) {
-  if (!geometry) return null;
-
-  const position = geometry.getAttribute("position");
-
-  if (!position || position.count < 3) {
-    return null;
-  }
-
-  const vertices = new Float32Array(position.array);
-
-  const indices = geometry.index
-    ? new Uint32Array(geometry.index.array)
-    : Uint32Array.from(
-        { length: position.count },
-        (_, index) => index
-      );
-
-  if (indices.length < 3) {
-    return null;
-  }
-
-  return [vertices, indices];
-}
 
 function pointOnSegment(x, z, a, b) {
   const dx = b[0] - a[0];
@@ -103,12 +80,12 @@ function pointInRing(x, z, ring) {
     const intersects =
       (a[1] > z) !== (b[1] > z) &&
       x <
-        (
-          (b[0] - a[0]) *
-          (z - a[1])
-        ) /
-          (b[1] - a[1]) +
-          a[0];
+      (
+        (b[0] - a[0]) *
+        (z - a[1])
+      ) /
+      (b[1] - a[1]) +
+      a[0];
 
     if (intersects) {
       inside = !inside;
@@ -188,12 +165,12 @@ function WaterSurface({ entity, sections }) {
   );
 
   const wallCollider = useMemo(
-    () => getColliderData(basin.wallGeometry),
+    () => geometryToTrimeshData(basin.wallGeometry),
     [basin]
   );
 
   const bottomCollider = useMemo(
-    () => getColliderData(basin.bottomGeometry),
+    () => geometryToTrimeshData(basin.bottomGeometry),
     [basin]
   );
 
@@ -411,13 +388,13 @@ function WaterSurface({ entity, sections }) {
             Math.max(
               0.01,
               bounds.width / 2 +
-                BALL_RADIUS
+              BALL_RADIUS
             ),
             sensorHeight / 2,
             Math.max(
               0.01,
               bounds.length / 2 +
-                BALL_RADIUS
+              BALL_RADIUS
             ),
           ]}
           position={[
@@ -445,9 +422,11 @@ function WaterSurface({ entity, sections }) {
   );
 }
 
+const EMPTY_SECTIONS = [];
+
 export default function SurfaceRenderer({
   entity,
-  sections = [],
+  sections = EMPTY_SECTIONS,
 }) {
   const surface =
     entity.surface ?? entity.type;

@@ -53,7 +53,47 @@ export const brick = {
             ...options,
         };
     },
+
+    ramp(
+        size = [2, 0.5, 2],
+        position = [0, 0, 0],
+        options = {}
+    ) {
+        return {
+            shape: "ramp",
+
+            size,
+            position,
+
+            rotation: [0, 0, 0],
+            segments: 32,
+
+            color: "#b8a58a",
+            surface: "concrete",
+
+            ...options,
+        };
+    },
+
+    boxWithHoles(
+        size = [2, 2, 2],
+        position = [0, 0, 0],
+        options = {}
+    ) {
+        return {
+            shape: "boxWithHoles",
+            size,
+            position,
+            rotation: [0, 0, 0],
+            holes: [],
+            segments: 32,
+            color: "#82796b",
+            ...options,
+        };
+    },
 };
+
+
 
 // --------------------------------------------------
 // Assembly helpers
@@ -98,6 +138,8 @@ export const elevatedPath = (options = {}) => ({
     ...options,
     type: "elevatedPath",
 });
+
+
 
 // --------------------------------------------------
 // Shared box used by existing obstacle recipes

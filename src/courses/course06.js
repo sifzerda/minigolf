@@ -1,187 +1,149 @@
 // src/courses/course06.js
 
-import { createCourseShape } from "./courseBuilder";
-import { roundedPolygon } from "./coursePresets";
+const BALL_RADIUS = 0.25;
 
-// ============================================================
-// COURSE 06 — MYSTERY CAVERNS
-// ============================================================
+const STRUCTURE_WIDTH = 11;
+const STRUCTURE_LENGTH = 5;
 
-const GRASS_COLOR = "#328b50";
-const WALL_COLOR = "#806d55";
-const ROCK_COLOR = "#82796b";
+const FLOOR_THICKNESS = 0.22;
+const RAMP_LENGTH = 3.2;
 
-// ============================================================
-// COURSE GEOMETRY
-// ============================================================
-
-const OUTER = roundedPolygon(
-  [
-    [-5, -12],
-    [5, -12],
-    [6, -11],
-    [6, 11],
-    [5, 12],
-    [-5, 12],
-    [-6, 11],
-    [-6, -11],
-  ],
-  0.6,
-  6
-);
-
-const shape = createCourseShape({
-  type: "polygon",
-  points: OUTER,
-  color: GRASS_COLOR,
-
-  wall: {
-    color: WALL_COLOR,
-    height: 0.55,
-    thickness: 0.25,
-  },
-});
-
-// ============================================================
-// MYSTERY EXITS
-// ============================================================
-
-// The CavernRenderer shuffles a one-to-one mapping
-// between these destinations once per session.
-// Exit positions are WORLD coordinates.
-
-const EXITS = [
+const TUNNELS = [
   {
-    position: [-3.4, 0.25, -7],
-    velocity: [0, 0, -1.2],
+    id: "left",
+    x: -3.2,
+    diameter: 0.9,
+    floorHeight: 0.7,
   },
-
-  // Winning destination — directly above the cup.
   {
-    position: [0, 0.38, -9.4],
-    velocity: [0, -0.3, 0],
+    id: "middle",
+    x: 0,
+    diameter: 0.8,
+    floorHeight: 1.8,
   },
-
   {
-    position: [3.4, 0.25, -7],
-    velocity: [0, 0, -1.2],
+    id: "right",
+    x: 3.2,
+    diameter: 0.9,
+    floorHeight: 0.7,
   },
 ];
 
-// ============================================================
-// ONE SOLID MASS WITH THREE TUNNELS
-// ============================================================
+// Structure extends below the course ground.
+const BASE_Y = -0.25;
 
-const TUNNEL_X = [-3.2, 0, 3.2];
+// Leave solid rock above the highest opening.
+const TOP_Y = Math.max(...TUNNELS.map((t) => t.floorHeight + BALL_RADIUS + t.diameter / 2)) + 0.6;
 
-const MYSTERY_CAVERNS = {
-  id: "course-06-mystery-caverns",
-  type: "cavern",
+const STRUCTURE_HEIGHT = TOP_Y - BASE_Y;
+const STRUCTURE_Y = (BASE_Y + TOP_Y) / 2;
+
+// --------------------------------------------------
+// BRICK ASSEMBLY
+// --------------------------------------------------
+
+const tunnelStructure = assembly({
+  id: "triple-tunnel-structure",
 
   position: [0, 0, 0],
   rotation: [0, 0, 0],
 
-  // One solid rectangular structure.
-  mass: {
-    shape: "box",
-    size: [11, 3.5, 5],
-  },
-
-  // Carve three passages through the mass.
-  tunnels: TUNNEL_X.map((x, entranceIndex) => ({
-    id: `mystery-passage-${entranceIndex + 1}`,
-
-    shape: "round",
-    radius: 0.85,
-    segments: 24,
-
-    // Tunnel coordinates are local to the mass.
-    // Extend beyond both faces for complete openings.
-    from: [x, 0.8, 3.5],
-    to: [x, 0.8, -3.5],
-
-    // Mystery teleport functionality.
-    portal: {
-      group: "course-06-mystery",
-      entranceIndex,
-
-      exits: EXITS,
-
-      // Sensor just inside the entrance.
-      sensorPosition: [x, 0.8, 1.8],
-      sensorRadius: 0.55,
-
-      // Activate only when entering the tunnel.
-      requireForward: true,
-    },
-  })),
-
-  color: ROCK_COLOR,
+  terrainAlign: false,
   friction: 0.85,
-  restitution: 0.15,
-};
+  restitution: 0.1,
 
-// ============================================================
-// COURSE DEFINITION
-// ============================================================
+  parts: [
+    // One solid box with three circular holes.
+    brick.boxWithHoles(
+      [
+        STRUCTURE_WIDTH,
+        STRUCTURE_HEIGHT,
+        STRUCTURE_LENGTH,
+      ],
+      [0, STRUCTURE_Y, 0],
+      {
+        id: "perforated-rock-wall",
+        color: "#82796b",
 
-const course06 = {
-  ...shape,
+        holes: TUNNELS.map((tunnel) => ({
+          x: tunnel.x,
 
-  id: "course-06",
-  number: 6,
-  name: "Mystery Caverns",
-  environment: "garden",
-  par: 2,
+          // Local Y relative to the box centre.
+          y:
+            tunnel.floorHeight +
+            BALL_RADIUS -
+            STRUCTURE_Y,
 
-  ballStart: [0, 0.25, 9.5],
+          radius: tunnel.diameter / 2,
+        })),
 
-  hole: {
-    position: [0, 0, -9.4],
-    radius: 0.43,
-  },
+        segments: 32,
+      }
+    ),
 
-  // ----------------------------------------------------------
-  // Boundaries
-  // ----------------------------------------------------------
+    // Flat, elevated floors through the holes.
+    ...TUNNELS.map((tunnel) =>
+      brick.box(
+        [
+          tunnel.diameter,
+          FLOOR_THICKNESS,
+          STRUCTURE_LENGTH,
+        ],
+        [
+          tunnel.x,
+          tunnel.floorHeight -
+            FLOOR_THICKNESS / 2,
+          0,
+        ],
+        {
+          id: `${tunnel.id}-floor`,
+          color: "#a87945",
+          friction: 0.9,
+        }
+      )
+    ),
 
-  boundaryRings: [OUTER],
+    // Front climbing ramps.
+    ...TUNNELS.map((tunnel) =>
+      brick.wedge(
+        [
+          tunnel.diameter,
+          tunnel.floorHeight,
+          RAMP_LENGTH,
+        ],
+        [
+          tunnel.x,
+          tunnel.floorHeight / 2,
+          STRUCTURE_LENGTH / 2 +
+            RAMP_LENGTH / 2,
+        ],
+        {
+          id: `${tunnel.id}-front-ramp`,
+          color: "#b8a58a",
+        }
+      )
+    ),
 
-  wallStyle: {
-    color: WALL_COLOR,
-    height: 0.55,
-    thickness: 0.25,
-    friction: 0.8,
-    restitution: 0.3,
-  },
-
-  walls: [],
-  surfaces: [],
-  ramps: [],
-
-  // ----------------------------------------------------------
-  // Obstacles
-  // ----------------------------------------------------------
-
-  obstacles: [
-    MYSTERY_CAVERNS,
+    // Back descending ramps.
+    ...TUNNELS.map((tunnel) =>
+      brick.wedge(
+        [
+          tunnel.diameter,
+          tunnel.floorHeight,
+          RAMP_LENGTH,
+        ],
+        [
+          tunnel.x,
+          tunnel.floorHeight / 2,
+          -STRUCTURE_LENGTH / 2 -
+            RAMP_LENGTH / 2,
+        ],
+        {
+          id: `${tunnel.id}-back-ramp`,
+          rotation: [0, Math.PI, 0],
+          color: "#b8a58a",
+        }
+      )
+    ),
   ],
-
-  // ----------------------------------------------------------
-  // Terrain
-  // ----------------------------------------------------------
-
-  terrain: {
-    width: 30,
-    length: 40,
-    resolution: 64,
-
-    baseHeight: 0,
-    defaultSurface: "grass",
-    color: GRASS_COLOR,
-
-    features: [],
-  },
-};
-
-export default course06;
+});

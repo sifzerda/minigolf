@@ -1,5 +1,7 @@
 // src/terrain/TerrainMesh.js
 
+// 	Adaptive subdivision and terrain triangulation
+
 import * as THREE from "three";
 import polygonClipping from "polygon-clipping";
 import { getTerrainHeight, prepareTerrainFeatures } from "./Terrain";

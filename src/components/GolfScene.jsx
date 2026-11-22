@@ -20,7 +20,6 @@ import HoleSensor from "../physics/HoleSensor";
 import BallPhysicsSystem from "../ecs/systems/BallPhysicsSystem";
 
 import CourseGeometryRenderer from "../renderers/CourseGeometryRenderer";
-import RampRenderer from "../renderers/RampRenderer";
 import SurfaceRenderer from "../renderers/SurfaceRenderer";
 import ObstacleRenderer from "../renderers/ObstacleRenderer";
 import FollowCamera from "../renderers/FollowCamera";
@@ -98,13 +97,6 @@ function CourseContent({ course, paused }) {
             key={entity.id}
             entity={entity}
             sections={sections}
-          />
-        ))}
-
-        {ramps.map((entity) => (
-          <RampRenderer
-            key={entity.id}
-            entity={entity}
           />
         ))}
 

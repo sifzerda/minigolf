@@ -1,7 +1,6 @@
 // src/ecs/setupGame.js
 
 import { world } from "./world";
-
 import { BALL_RADIUS } from "./constants/physics";
 
 import {

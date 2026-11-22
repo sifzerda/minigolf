@@ -1,12 +1,24 @@
 // src/components/GolfScene.jsx
 
-import { useRef, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Physics } from "@react-three/rapier";
-import { ballQuery, holeQuery, obstacleQuery, rampQuery, surfaceQuery} from "../ecs/world";
+
+import {
+  ballQuery,
+  holeQuery,
+  obstacleQuery,
+  rampQuery,
+  surfaceQuery,
+} from "../ecs/world";
+
+import { setupGame, clearGame } from "../ecs/setupGame";
+import { PHYSICS } from "../ecs/constants/physics";
+import { getEnvironment } from "../ecs/constants/environments";
 
 import GolfBall from "../physics/GolfBall";
 import HoleSensor from "../physics/HoleSensor";
 import BallPhysicsSystem from "../ecs/systems/BallPhysicsSystem";
+
 import CourseGeometryRenderer from "../renderers/CourseGeometryRenderer";
 import RampRenderer from "../renderers/RampRenderer";
 import SurfaceRenderer from "../renderers/SurfaceRenderer";
@@ -18,30 +30,18 @@ import EnvironmentRenderer from "../renderers/EnvironmentRenderer";
 import HoleFlag from "../renderers/HoleFlag";
 import TerrainRenderer from "../renderers/TerrainRenderer";
 import GolfControls from "./GolfControls";
-
-import { setActiveTerrain } from "../ecs/systems/SurfaceSystem";
 import { renderActivity } from "../utils/renderActivity";
-import { getCourseHeight } from "../terrain/Terrain";
 
-const GRAVITY = [0, -9.81, 0];
+const GRAVITY = [0, PHYSICS.gravity, 0];
+const EMPTY_SECTIONS = [];
 
-const FLAG_COLORS = {
-  garden: "#ff4545",
-  desert: "#ff9f1c",
-  snow: "#0088ff",
-  volcanic: "#ff5500",
-  neon: "#00e5ff",
-};
-
-export default function GolfScene({
-  course,
-  paused = false,
-}) {
+function CourseContent({ course, paused }) {
   const ballRef = useRef(null);
   const settledRef = useRef(false);
-  const activeSurfaceRef = useRef("grass");
 
-  const entities = useMemo(() => ({
+  // ECS is initialized before this component mounts.
+  const entities = useMemo(
+    () => ({
       ball: [...ballQuery][0],
       hole: [...holeQuery][0],
       obstacles: [...obstacleQuery],
@@ -60,38 +60,20 @@ export default function GolfScene({
     };
   }, []);
 
-  useEffect(() => {
-    setActiveTerrain(course?.terrain);
+  const { ball, hole, obstacles, ramps, surfaces } = entities;
 
-    return () => {
-      setActiveTerrain(null);
-    };
-  }, [course?.terrain]);
-
-  if (!course || !entities.ball || !entities.hole) {
-    return null;
-  }
+  if (!ball || !hole) return null;
 
   const theme = course.environment ?? "garden";
+  const sections = course.sections ?? EMPTY_SECTIONS;
 
   return (
     <>
       <EnvironmentRenderer theme={theme} />
 
       <HoleFlag
-        position={[
-          course.hole.position[0],
-          getCourseHeight(
-            course.hole.position[0],
-            course.hole.position[2],
-            course.terrain
-          ),
-          course.hole.position[2],
-        ]}
-        color={
-          FLAG_COLORS[theme] ??
-          FLAG_COLORS.garden
-        }
+        position={hole.position}
+        color={getEnvironment(theme).flagColor ?? "#ff4545"}
       />
 
       <Physics
@@ -102,28 +84,33 @@ export default function GolfScene({
         colliders={false}
         paused={paused}
       >
-        {course.terrain && (<TerrainRenderer terrain={course.terrain} sections={course.sections} />)}
+        {course.terrain && (
+          <TerrainRenderer
+            terrain={course.terrain}
+            sections={sections}
+          />
+        )}
 
         <CourseGeometryRenderer course={course} />
 
-        {entities.surfaces.map((entity) => (
+        {surfaces.map((entity) => (
           <SurfaceRenderer
             key={entity.id}
             entity={entity}
-            sections={course.sections ?? []}
+            sections={sections}
           />
         ))}
 
-        {entities.ramps.map((entity) => (
+        {ramps.map((entity) => (
           <RampRenderer
             key={entity.id}
             entity={entity}
           />
         ))}
 
-        {entities.obstacles.map((entity, index) => (
+        {obstacles.map((entity) => (
           <ObstacleRenderer
-            key={entity.id ?? `ecs-${index}`}
+            key={entity.id}
             entity={entity}
             ballRef={ballRef}
             paused={paused}
@@ -131,18 +118,18 @@ export default function GolfScene({
         ))}
 
         <GolfBall
-          entity={entities.ball}
+          entity={ball}
           ballRef={ballRef}
         />
 
         <BallPhysicsSystem
           ballRef={ballRef}
           settledRef={settledRef}
-          activeSurfaceRef={activeSurfaceRef}
+          terrain={course.terrain}
         />
 
         <HoleSensor
-          hole={entities.hole}
+          hole={hole}
           ballRef={ballRef}
         />
 
@@ -165,9 +152,30 @@ export default function GolfScene({
       <GolfControls
         ballRef={ballRef}
         settledRef={settledRef}
-        startPosition={entities.ball.position}
+        startPosition={ball.position}
         paused={paused}
       />
     </>
   );
+}
+
+export default function GolfScene({ course, paused = false }) {
+  const [loadedCourse, setLoadedCourse] = useState(null);
+
+  useEffect(() => {
+    if (!course) return;
+
+    setupGame(course);
+    setLoadedCourse(course);
+
+    return () => {
+      clearGame();
+    };
+  }, [course]);
+
+  if (!course || loadedCourse !== course) {
+    return null;
+  }
+
+  return <CourseContent course={course} paused={paused} />;
 }

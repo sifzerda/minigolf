@@ -7,9 +7,8 @@ import { Camera, RotateCcw, List, Pause } from "lucide-react";
 
 import { courses } from "../courses";
 import useGameStore from "../store/useGameStore";
-
+import GolfScene from "./GolfScene";
 import ShotPowerMeter from "./ShotPowerMeter";
-import CourseSession from "./CourseSession";
 
 import FrameRateLimit from "../renderers/FrameRateLimit";
 import { renderActivity } from "../utils/renderActivity";
@@ -371,7 +370,6 @@ export default function GolfGame() {
 
             {!completed && !gameComplete && (
                 <Canvas
-                    key={`${courseIndex}-${sessionId}`}
                     frameloop="always"
                     shadows="soft"
                     dpr={[1, 1.25]}
@@ -394,7 +392,11 @@ export default function GolfGame() {
                 >
                     <GamePauseProvider paused={paused}>
                         <FrameRateLimit fps={45} idleFps={10} course={course} />
-                        <CourseSession courseIndex={courseIndex} paused={paused} />
+                        <GolfScene
+                            key={`${courseIndex}-${sessionId}`}
+                            course={course}
+                            paused={paused}
+                        />
                     </GamePauseProvider>
                     {import.meta.env.DEV && <Stats />}
 

@@ -568,16 +568,27 @@ function pointOnSegment(x, z, a, b) {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
 
+  const lengthSquared = dx * dx + dz * dz;
+
+  // Handle zero-length edges caused by
+  // repeated polygon start/end vertices.
+  //
+  // Previously, these edges incorrectly
+  // reported every point as being on them.
+  if (lengthSquared <= EPS * EPS) {
+    return Math.hypot(
+      x - a[0],
+      z - a[1]
+    ) <= EPS;
+  }
+
   const cross =
     (x - a[0]) * dz -
     (z - a[1]) * dx;
 
   if (
     Math.abs(cross) >
-    EPS * Math.max(
-      1,
-      Math.hypot(dx, dz)
-    )
+    EPS * Math.max(1, Math.sqrt(lengthSquared))
   ) {
     return false;
   }
@@ -588,7 +599,7 @@ function pointOnSegment(x, z, a, b) {
 
   return (
     dot >= -EPS &&
-    dot <= dx * dx + dz * dz + EPS
+    dot <= lengthSquared + EPS
   );
 }
 

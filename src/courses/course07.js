@@ -1,98 +1,200 @@
 // src/courses/course07.js
 
-import { createCourseShape } from "./courseBuilder";
-import { roundedPolygon } from "./coursePresets";
-import { ridge } from "./terrainPresets";
+import { createLayoutCourse } from "./layoutCourse.js";
+import { terrainBrick } from "./terrainBricks.js";
 
 // ============================================================
-// COURSE 07 — TWIN HILLS
+// COURSE 07 — ROLLING FIELDS
 // ============================================================
 
 const GRASS_COLOR = "#328b50";
 const WALL_COLOR = "#786b50";
 
 // ============================================================
-// COURSE GEOMETRY
+// FIELD BOUNDARY
 // ============================================================
 
-const OUTER = roundedPolygon(
-  [
-    // Starting area
-    [1.6, 10],
-    [1.9, 8],
+// A wide, open field with softly irregular edges.
+// Approximately 27 units wide and 23 units long.
 
-    // First hill
-    [2.8, 6.3],
-    [3.3, 5.1],
-    [2.4, 4],
+const FIELD_POINTS = [
+  [-11.5, -11.5],
+  [11.5, -11.5],
+  [13, -9],
+  [13.7, -5],
+  [13.4, 0],
+  [13.7, 5],
+  [12.8, 9.5],
+  [11.6, 11.5],
+  [-11.6, 11.5],
+  [-13, 9],
+  [-13.7, 5],
+  [-13.4, 0],
+  [-13.7, -5],
+  [-13, -9],
+];
 
-    // Narrow middle section
-    [1.8, 2.7],
-    [1.8, 0.2],
+// ============================================================
+// LARGE ROLLING HILLS
+// ============================================================
 
-    // Second hill
-    [2.3, -1.6],
-    [3.1, -2.7],
-    [2.8, -3.6],
+// [x, z, radius, height]
+//
+// These create the broad, sweeping geography
+// of the field rather than two continuous ridges.
 
-    // Wide area around the hole
-    [2.2, -4.9],
-    [2.2, -7.7],
-    [1.5, -9.7],
-    [0.3, -10.1],
-    [-1.6, -10.1],
-    [-2.8, -9.4],
-    [-3.3, -8],
-    [-3.4, -6],
+const LARGE_HILLS = [
+  [-9,   7.5, 4.1, 0.85],
+  [-4.5, 5.3, 3.2, 0.65],
+  [4.2,  7.2, 3.5, 0.80],
+  [9.7,  5.6, 3.8, 0.90],
 
-    // Lower boundary — second hill
-    [-3, -4.9],
-    [-2, -3.7],
-    [-0.9, -2.7],
+  [-9.5, 1.4, 4.3, 1.10],
+  [-2.0, 2.8, 3.1, 0.75],
+  [5.4,  1.6, 3.8, 1.15],
+  [10.3, -0.3, 3.2, 0.80],
 
-    // Narrow middle section
-    [-0.9, -1.8],
-    [-1.4, -0.1],
-    [-1.4, 2.5],
+  [-8.5, -5.0, 3.8, 0.95],
+  [-2.8, -3.7, 3.5, 1.00],
+  [3.5,  -4.2, 3.6, 0.90],
+  [9.6,  -5.5, 3.7, 1.10],
 
-    // Lower boundary — first hill
-    [-1, 4],
-    [-0.7, 5],
-    [-1.8, 6.1],
+  [-9.4, -9.0, 2.8, 0.65],
+  [-4.7, -8.4, 3.0, 0.70],
+  [4.2,  -9.0, 3.0, 0.60],
+  [9.0,  -9.0, 3.1, 0.80],
+];
 
-    // Back to starting area
-    [-2.4, 7.6],
-    [-2.4, 9.6],
-    [-1.7, 10.1],
-  ],
-  0.5,
-  5
+// ============================================================
+// SMALLER HILLS AND MOUNDS
+// ============================================================
+
+// Smaller raised areas add local variation
+// on top of the broad rolling landscape.
+
+const SMALL_HILLS = [
+  [-10.4, 9.5, 1.6, 0.32],
+  [-6.3,  8.4, 2.0, 0.38],
+  [7.2,   9.0, 2.0, 0.45],
+  [11.2,  8.2, 1.4, 0.30],
+
+  [-5.0, 1.0, 1.8, 0.55],
+  [1.0,  4.0, 2.0, 0.40],
+  [8.0,  3.3, 2.0, 0.55],
+
+  [-11.0, -2.0, 1.9, 0.55],
+  [-5.6,  -2.0, 1.7, 0.40],
+  [1.2,   -1.8, 1.8, 0.45],
+  [7.3,   -2.0, 1.8, 0.45],
+
+  [-6.5, -6.4, 2.0, 0.50],
+  [0.2,  -5.5, 1.7, 0.40],
+  [6.0,  -6.6, 1.9, 0.50],
+  [11.2, -8.0, 1.5, 0.32],
+];
+
+// ============================================================
+// LARGE VALLEYS
+// ============================================================
+
+// Broad depressions create natural routes
+// between the surrounding hills.
+
+// [x, z, radius, depth]
+
+const LARGE_VALLEYS = [
+  [-6.0, 6.5, 3.2, 0.40],
+  [0.0,  6.2, 2.7, 0.35],
+  [8.1,  7.2, 2.7, 0.35],
+
+  [-11.0, 3.3, 2.8, 0.40],
+  [-4.0,  3.2, 2.6, 0.50],
+  [2.6,   2.5, 2.5, 0.50],
+  [9.3,   2.2, 2.6, 0.40],
+
+  [-7.0, -2.2, 3.0, 0.50],
+  [0.0,  -1.5, 3.1, 0.62],
+  [7.0,  -1.4, 2.7, 0.55],
+
+  [-10.0, -7.0, 2.7, 0.45],
+  [-3.5,  -6.0, 2.2, 0.38],
+  [3.8,   -6.4, 2.4, 0.52],
+  [10.0,  -8.5, 2.2, 0.40],
+];
+
+// ============================================================
+// SMALL DEPRESSIONS
+// ============================================================
+
+// Smaller hollows create subtle breaks
+// in the slopes of larger hills.
+
+const SMALL_VALLEYS = [
+  [-10.5, 8.6, 1.2, 0.19],
+  [-2.3,  7.0, 1.2, 0.20],
+  [10.8,  9.1, 1.2, 0.22],
+
+  [-8.5, 4.5, 1.45, 0.28],
+  [0.8,  4.4, 1.3, 0.23],
+  [6.3,  4.1, 1.5, 0.25],
+
+  [-11.2, -0.8, 1.5, 0.28],
+  [-2.7,  -0.2, 1.5, 0.30],
+  [4.6,   -0.9, 1.5, 0.25],
+
+  [-8.2, -4.9, 1.6, 0.29],
+  [2.3,  -3.8, 1.3, 0.22],
+  [9.1,  -4.2, 1.5, 0.29],
+
+  [-5.9, -9.3, 1.4, 0.24],
+  [6.6,  -9.3, 1.4, 0.23],
+];
+
+// ============================================================
+// GENERATE MODULAR TERRAIN FEATURES
+// ============================================================
+
+// Fixed feature data keeps the geography
+// deterministic across game sessions and previews.
+
+const hills = [
+  ...LARGE_HILLS,
+  ...SMALL_HILLS,
+].map(([x, z, radius, height]) =>
+  terrainBrick.hill({
+    position: [x, z],
+    radius,
+    height,
+    blend: "add",
+  })
 );
 
-const shape = createCourseShape({
-  type: "polygon",
-  points: OUTER,
-  color: GRASS_COLOR,
-
-  wall: {
-    color: WALL_COLOR,
-    height: 0.55,
-    thickness: 0.25,
-  },
-});
+const valleys = [
+  ...LARGE_VALLEYS,
+  ...SMALL_VALLEYS,
+].map(([x, z, radius, depth]) =>
+  terrainBrick.valley({
+    position: [x, z],
+    radius,
+    depth,
+    blend: "add",
+  })
+);
 
 // ============================================================
 // COURSE DEFINITION
 // ============================================================
 
-const course07 = {
-  ...shape,
-
+const course07 = createLayoutCourse({
   id: "course-07",
   number: 7,
-  name: "Twin Hills",
+  name: "Rolling Fields",
   environment: "garden",
   par: 3,
+
+  // ----------------------------------------------------------
+  // START AND HOLE
+  // ----------------------------------------------------------
 
   ballStart: [0, 0.25, 9],
 
@@ -102,56 +204,57 @@ const course07 = {
   },
 
   // ----------------------------------------------------------
-  // Boundaries
+  // WIDE FIELD GEOMETRY
   // ----------------------------------------------------------
 
-  boundaryRings: [OUTER],
+  shape: {
+    type: "rounded",
+    points: FIELD_POINTS,
 
-  wallStyle: {
-    color: WALL_COLOR,
-    height: 0.55,
-    thickness: 0.25,
-    friction: 0.8,
-    restitution: 0.3,
+    tolerance: 0.025,
+    maxSegmentLength: 0.6,
+
+    color: GRASS_COLOR,
+
+    wall: {
+      color: WALL_COLOR,
+      height: 0.55,
+      thickness: 0.25,
+      friction: 0.8,
+      restitution: 0.3,
+    },
   },
 
-  walls: [],
-  surfaces: [],
-  obstacles: [],
-  ramps: [],
-
   // ----------------------------------------------------------
-  // Terrain — two hills
+  // TERRAIN SETTINGS
   // ----------------------------------------------------------
 
   terrain: {
-    width: 24,
+    width: 34,
     length: 32,
-    resolution: 96,
+    resolution: 128,
 
     baseHeight: 0,
     defaultSurface: "grass",
     color: GRASS_COLOR,
+  },
 
+  // ----------------------------------------------------------
+  // TERRAIN FEATURES
+  // ----------------------------------------------------------
+
+  geography: {
     features: [
-      // First hill — moderately steep
-      ridge({
-        start: [-4, 5],
-        end: [4, 5],
-        width: 4.6,
-        height: 1.0,
-      }),
-
-      // Second hill — slightly taller
-      ridge({
-        start: [-4, -2.7],
-        end: [4, -2.7],
-        width: 4.8,
-        height: 2.5,
-        blend: "max",
-      }),
+      ...hills,
+      ...valleys,
     ],
   },
-};
+
+  // ----------------------------------------------------------
+  // VALIDATION
+  // ----------------------------------------------------------
+
+  validate: import.meta.env.DEV,
+});
 
 export default course07;
